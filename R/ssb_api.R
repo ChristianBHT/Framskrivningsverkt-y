@@ -1,32 +1,14 @@
-# Hent data til framskrivninger i kommunale omsorgstjenester.
-# Kjør i R/RStudio: source("01_hent_ssb_data.R", encoding = "UTF-8")
-# Installer pakkene én gang: install.packages(c("httr2", "jsonlite"))
-# Filene lagres under data/ssb i gjeldende arbeidsmappe (getwd()).
+# Historisk befolkning fra SSB, tabell 07459, API v2.
+# Installer én gang: install.packages(c("httr2", "rjstat"))
+# Kjør hele scriptet i R/RStudio. Filer lagres relativt til getwd().
+# Kilde: https://www.ssb.no/statbank/table/07459/
+# Regiongrupperingen agg_KommSummer brukes slik den er definert av SSB.
+# Tallene gjelder 1. januar. Manglende verdier beholdes som NA.
 
 # ---- Innstillinger ----------------------------------------------------------
-kommuner_befolkning <- c("3101") 
-kommuner_KOSTRA <- c("3101")
-historiske_aar <- 2005:2025
-befolkningsaar <- 2005:2026             # Folkemengde 1. januar.
-framskrivingsaar <- 2026:2050
-tjenester <- c("A", "B")              # A: hjemmetjenester, B: institusjon.
-alternativer <- c("Personer", "Personer1", "Personer2") # MMMM, LLML, HHMH.
+years <- 2005:2026
 utmappe <- file.path("data", "ssb")
 
-# 12003: Brukere av omsorgstjenester etter alder og tjenestegruppe.
-# 07459: Historisk folkemengde etter ettårig alder og kjønn.
-# 14746: Regionale befolkningsframskrivninger, publisert i 2026.
-# Kilder: https://www.ssb.no/statbank/table/12003/
-#         https://www.ssb.no/statbank/table/07459/
-#         https://www.ssb.no/statbank/table/14746/
-# Ulike referansetidspunkt beholdes. Ingen kobling eller modell estimeres her.
-# Kommunegrenser/koder harmoniseres ikke. Manglende tall blir NA, aldri null.
-
-# Installer én gang
-install.packages("rjstat")
-library(jstat)
-years <- c(2005:2026)
-# Loop over all municipalities and fetch data from SSB API
 regioner <- c(
   "K-3101", "K-3103", "K-3105", "K-3107", "K-3110", "K-3112",
   "K-3114", "K-3116", "K-3118", "K-3120", "K-3122", "K-3124",
@@ -93,32 +75,111 @@ regioner <- c(
   "K-5614", "K-5616", "K-5618", "K-5620", "K-5622", "K-5624",
   "K-5626", "K-5628", "K-5630", "K-5632", "K-5634", "K-5636"
 )
-# empty dataset
-data <- data.frame()
-for (region in regioner) {
-  url <- paste0(
+
+# ---- Funksjoner -------------------------------------------------------------
+lag_befolkningsurl <- function(region, years) {
+  if (length(region) != 1L || is.na(region) ||
+      !grepl("^K-[0-9]{4}$", region)) {
+    stop("region må være én kode, for eksempel 'K-3101'.")
+  }
+  if (!is.numeric(years) || !length(years) || anyNA(years) ||
+      any(!is.finite(years)) || any(years != floor(years))) {
+    stop("years må være en numerisk vektor med hele årstall.")
+  }
+  paste0(
     "https://data.ssb.no/api/pxwebapi/v2/tables/07459/data",
     "?lang=no&outputFormat=json-stat2",
-  "&valuecodes[ContentsCode]=*",
-  "&valuecodes[Tid]=", paste(years, collapse = ","),
-  "&valuecodes[Region]=", region,
-  "&codelist[Region]=agg_KommSummer",
-  "&valuecodes[Alder]=*",
-  "&codelist[Alder]=vs_AlleAldre00B",
-  "&valuecodes[Kjonn]=*",
-  "&heading=ContentsCode,Tid",
-  "&stub=Region,Kjonn,Alder"
-)
-
-befolkning <- rjstat::fromJSONstat(
-  URLencode(url),
-  naming = "id"
-)
-# Append dataset
-data <- rbind(data, befolkning)
-# add progress %
-cat("Progress: ", which(regioner == region), " of ", length(regioner), "\n")
+    "&valuecodes%5BContentsCode%5D=Personer1",
+    "&valuecodes%5BTid%5D=", paste(sort(unique(years)), collapse = ","),
+    "&valuecodes%5BRegion%5D=", region,
+    "&codelist%5BRegion%5D=agg_KommSummer",
+    "&valuecodes%5BAlder%5D=*",
+    "&codelist%5BAlder%5D=vs_AlleAldre00B",
+    "&valuecodes%5BKjonn%5D=1,2",
+    "&heading=ContentsCode,Tid&stub=Region,Kjonn,Alder"
+  )
 }
-# Samme navn på tallkolonnen som i det tidligere scriptet
-names(data)[names(data) == "value"] <- "verdi"
+
+hent_kommune <- function(region, years) {
+  url <- lag_befolkningsurl(region, years)
+  respons <- httr2::request(url) |>
+    httr2::req_timeout(120) |>
+    httr2::req_retry(max_tries = 4) |>
+    httr2::req_perform()
+  
+  d <- rjstat::fromJSONstat(
+    httr2::resp_body_string(respons), naming = "id"
+  )
+  krav <- c("Region", "Tid", "Kjonn", "Alder", "ContentsCode", "value")
+  if (!is.data.frame(d) || !nrow(d) || !all(krav %in% names(d))) {
+    stop("Uventet datastruktur fra SSB for ", region, ".")
+  }
+  if (anyNA(d$Region) || any(d$Region != region) ||
+      !setequal(as.character(d$Tid), as.character(years))) {
+    stop("Svaret fra SSB dekker ikke forespurt kommune og år: ", region, ".")
+  }
+  if (anyDuplicated(d[c("Region", "Tid", "Kjonn", "Alder", "ContentsCode")])) {
+    stop("Dupliserte observasjoner i svaret fra SSB for ", region, ".")
+  }
+  names(d)[names(d) == "value"] <- "verdi"
+  # Behold koder som tekst, blant annet 000 og 105+ i Alder.
+  for (kolonne in setdiff(krav, "value")) d[[kolonne]] <- as.character(d[[kolonne]])
+  d$ssb_tabell <- "07459"
+  d$hentet_utc <- format(Sys.time(), tz = "UTC", usetz = TRUE)
+  d
+}
+
+hent_befolkning <- function(regioner, years) {
+  if (!is.character(regioner) || !length(regioner) || anyNA(regioner) ||
+      any(!grepl("^K-[0-9]{4}$", regioner)) || anyDuplicated(regioner)) {
+    stop("regioner må være unike kommunekoder som 'K-3101'.")
+  }
+  # Valider år før første nettverkskall.
+  invisible(lag_befolkningsurl(regioner[1], years))
+  resultater <- vector("list", length(regioner))
+  n <- length(regioner)
+  for (i in seq_along(regioner)) {
+    region <- regioner[i]
+    message(sprintf("Henter %s (%d av %d) ...", region, i, n))
+    resultater[[i]] <- tryCatch(
+      hent_kommune(region, years),
+      error = function(e) stop("Nedlasting stoppet ved ", region, ": ",
+                               conditionMessage(e), " Ingen samlet fil er lagret fra denne kjøringen.",
+                               call. = FALSE)
+    )
+    message(sprintf("Ferdig: %.1f %%", 100 * i / n))
+    if (i < n) Sys.sleep(1)  # Unngå mange forespørsler på kort tid.
+  }
+  befolkning <- do.call(rbind, resultater)
+  rownames(befolkning) <- NULL
+  if (anyNA(befolkning$verdi)) {
+    warning(sum(is.na(befolkning$verdi)),
+            " manglende befolkningstall. Disse er beholdt som NA.")
+  }
+  befolkning
+}
+
+# ---- Kjør og lagre ----------------------------------------------------------
+for (pakke in c("httr2", "rjstat")) {
+  if (!requireNamespace(pakke, quietly = TRUE)) {
+    stop("Mangler ", pakke,
+         ". Kjør install.packages(c('httr2', 'rjstat')) først.")
+  }
+}
+
+befolkning <- hent_befolkning(regioner, years)
+
+dir.create(utmappe, recursive = TRUE, showWarnings = FALSE)
+saveRDS(befolkning, file.path(utmappe, "07459.rds"))
+utils::write.csv(befolkning, file.path(utmappe, "07459.csv"),
+                 row.names = FALSE, na = "", fileEncoding = "UTF-8")
+saveRDS(list(
+  tabell = "07459", regioner = regioner, years = years,
+  url = vapply(regioner, lag_befolkningsurl, character(1), years = years),
+  regiongruppering = "agg_KommSummer", alderskodeliste = "vs_AlleAldre00B"
+), file.path(utmappe, "07459_utvalg.rds"))
+
+message(nrow(befolkning), " rader lagret i ", normalizePath(utmappe))
+# Ved senere innlesing: befolkning <- readRDS("data/ssb/07459.rds")
+# Bruk RDS for å bevare kommunekoder, kjønn og alder som tekst.
 
