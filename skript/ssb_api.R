@@ -182,4 +182,110 @@ saveRDS(list(
 message(nrow(befolkning), " rader lagret i ", normalizePath(utmappe))
 # Ved senere innlesing: befolkning <- readRDS("data/ssb/07459.rds")
 # Bruk RDS for å bevare kommunekoder, kjønn og alder som tekst.
+# Install once:
+# install.packages(c("httr2", "rjstat"))
+
+get_table_11645 <- function(region, years = 2005:2025,
+                            tjenester = c("12", "29", "15", "21")) {
+  url <- paste0(
+    "https://data.ssb.no/api/pxwebapi/v2/tables/11645/data",
+    "?lang=no&outputFormat=json-stat2",
+    "&valuecodes%5BContentsCode%5D=*",
+    "&valuecodes%5BTid%5D=", paste(sort(unique(years)), collapse = ","),
+    "&valuecodes%5BRegion%5D=", paste(region, collapse = ","),
+    "&codelist%5BRegion%5D=agg_KommSummerS",
+    "&valuecodes%5BTenesteType%5D=", paste(tjenester, collapse = ","),
+    "&valuecodes%5BAlder%5D=*",
+    "&heading=ContentsCode,Tid,TenesteType",
+    "&stub=Region,Alder"
+  )
+# print(url)  
+  response <- httr2::request(url) |>
+    httr2::req_timeout(120) |>
+    httr2::req_retry(max_tries = 4) |>
+    httr2::req_perform()
+  
+  data <- rjstat::fromJSONstat(
+    httr2::resp_body_string(response),
+    naming = "id"
+  )
+  
+  names(data)[names(data) == "value"] <- "verdi"
+  
+  data
+}
+
+# Example — all available years:
+omsorg <- get_table_11642(region = "K.3101", years = "*")
+
+get_table_12292 <- function(region, years = 2005:2025, 
+                            tjenester = c("12", "29", "15", "21")){
+  url <- paste0(
+    "https://data.ssb.no/api/pxwebapi/v2/tables/12292/data",
+    "?lang=no&outputFormat=json-stat2",
+    "&valuecodes%5BTid%5D=", paste(sort(unique(years)), collapse = ","),
+    "&valuecodes%5BKOKkommuneregion0000%5D=", paste(region, collapse = ","),
+    "&codelist%5BKOKkommuneregion0000%5D=agg_KOGkommuneregion000005401",
+    "&valuecodes%5BContentsCode%5D=", paste(tjenester, collapse = ","),
+    "&heading=Tid,ContentsCode&stub=KOKkommuneregion0000"
+  )
+  response <- httr2::request(url) |>
+    httr2::req_timeout(120) |>
+    httr2::req_retry(max_tries = 4) |>
+    httr2::req_perform()
+  data <- rjstat::fromJSONstat(
+    httr2::resp_body_string(response),
+    naming = "id"
+  )
+  names(data)[names(data) == "value"] <- "verdi"
+  data
+}
+get_table_04686 <- function(region, 
+                            years = 2008:2016, 
+                            tjenester = c("CRC3554053040", 
+                                          "CRC3050941668", 
+                                          "CRC2464749921", 
+                                          "CRC924095442", 
+                                          "CRC954440742", 
+                                          "CRC3360864005", 
+                                          "CRC1362622823", 
+                                          "CRC747899133", 
+                                          "CRC1815124696",
+                                          "CRC3285350786",
+                                          "CRC1297612858",
+                                          "CRC456632910",
+                                          "CRC3384594087",
+                                          "CRC3398236249",
+                                          "CRC2628761217",
+                                          "CRC2881919331",
+                                          "CRC1807410924",
+                                          "CRC2348993515",
+                                          "CRC2794288003",
+                                          "CRC1600056472")){
+  url <- paste0("https://data.ssb.no/api/pxwebapi/v2/tables/04686/data",
+                "?lang=no&outputFormat=json-stat2",
+                "&valuecodes%5BTid%5D=", paste(sort(unique(years)), collapse = ","),
+                "&valuecodes%5BRegion%5D=", paste(region, collapse = ","),
+                "&codelist%5BRegion%5D=agg_KostraKommuner",
+                "&valuecodes%5BContentsCode%5D=", paste(tjenester, collapse = ","),
+                "&heading=Tid,ContentsCode&stub=Region"
+  )
+  print(url)
+  response <- httr2::request(url) |> 
+    httr2::req_timeout(120) |>
+    httr2::req_retry(max_tries = 4) |>
+    httr2::req_perform()
+  
+  data <- rjstat::fromJSONstat(
+    httr2::resp_body_string(response),
+    naming = "id"
+  )
+  names(data)[names(data) == "value"] <- "verdi"
+  data
+}
+test <- get_table_04686(region = "0101", years = 2008:2010)
+
+# All data sets downloaded here only has ContentsCode  (tjenester) these needs to be re encoded into sensible names
+
+
 
