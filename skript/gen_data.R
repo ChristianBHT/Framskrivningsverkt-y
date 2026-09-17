@@ -1,14 +1,11 @@
+population <- read_csv("~/Framskrivningsverktøy/data/ssb/07459.csv")
 # Dette scriptet genererer analysedatasett.
 # Dictionary with dementia prevalence per 1000
 
-# Kjør etter 01_hent_ssb_data.R:
-# source("02_beregn_historisk_demens.R", encoding = "UTF-8")
-# Bruker befolkning i R, eller leser data/ssb/07459.rds hvis objektet mangler.
-# Ingen ekstra pakker kreves.
 # Estimater = folkemengde 1. januar * oppgitt prevalens, ikke observerte tilfeller.
 # Samme prevalens brukes i alle år; historiske endringer skyldes demografien.
 
-prevalens_enhet <- "andel"  # "andel" eller "per_1000". Avklar med ratekilden.
+prevalens_enhet <- "andel"  # "andel" eller "per_1000". 
 demens_utmappe <- file.path("data", "ssb")
 
 # Brukeroppgitte rater. Tolket som andeler: 0.509160 = 50.916 %.
