@@ -287,7 +287,7 @@ lag_tidsserie <- function(kommune, variabel_id, framskrevet_override = NULL) {
 ## UI
 ## ============================================================================
 ui <- page_sidebar(
-  title = "Omsorg 2050 - Resultater",
+  title = "Framskrivningsmodellen Fram - Resultater",
   theme = bs_theme(version = 5, bootswatch = "flatly"),
 
   sidebar = sidebar(

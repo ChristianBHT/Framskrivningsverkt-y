@@ -2,9 +2,11 @@
 
 Dette dokumentet beskriver de statistiske modellene som brukes til å
 framskrive Y_1, Y_2*, Y_4 og Y_5: likninger, estimeringsprosedyre,
-kryssvalideringsresultater og framskrivningsmetode. For BEGRUNNELSENE bak
-disse valgene (hvorfor Poisson, hvorfor intercept-only, hvorfor 2010 er
-utelatt for Y_1 osv.), se [beslutningslogg.md](beslutningslogg.md).
+kryssvalideringsresultater, framskrivningsmetode og
+usikkerhetskvantifisering. For BEGRUNNELSENE bak disse valgene (hvorfor
+Poisson, hvorfor intercept-only i kryssvalideringen men slope-modell i
+framskrivningen, hvorfor 2010 er utelatt for Y_1 osv.), se
+[beslutningslogg.md](beslutningslogg.md).
 
 **NB**: dette dokumentet er bevisst IKKE tilgjengelig fra selve
 Shiny-appen (`app.R`) - se punkt 6 i beslutningsloggen.
@@ -61,8 +63,16 @@ u_k ~ N(0, σ_u²)
 | Intercept + korrelert helning på demensandel | 68,0 | 34,2 | 0,9985 |
 
 Helningsvarianten gir 91 av 357 kommuner en negativ effektiv helning på
-demensandel - derfor brukes intercept-only-modellen til framskrivning,
-selv om helningsvarianten scorer bedre på CV (se beslutningslogg pkt. 3).
+demensandel - opprinnelig grunnen til at intercept-only-modellen ble brukt
+til framskrivning, selv om helningsvarianten scorer bedre på CV. **Denne
+policyen er reversert** (se beslutningslogg pkt. 9 og pkt. 7 lenger ned i
+dette dokumentet): framskrivning bruker nå ALLTID helningsvarianten
+(`hovedmodell_slope`), men med en ANKRINGSMETODE som gjør at kommunens
+egen (potensielt feil-fortegnede) helning aldri brukes på framtidig
+demensandel-vekst - bare på et fast, historisk ankerpunkt. CV-tallene over
+gjelder fortsatt som en RÅ sammenligning av de to modellvariantene UTEN
+ankring, og er derfor fortsatt informative for å forstå hvorfor
+helningsvarianten historisk ble ansett som risikabel.
 
 **2010 er utelatt** fra estimeringsdataene for denne variabelen (se
 beslutningslogg pkt. 1).
@@ -100,6 +110,10 @@ der `Y_2_stjerne_ialt = Y_2_ialt + Y_3_a_ialt`.
 Her er intercept-only-modellen faktisk BEST på kryssvalidering i tillegg
 til å unngå fortegnsproblemet (95/355 kommuner med negativ effektiv
 helning i den korrelerte helningsvarianten, 78/355 i den ukorrelerte).
+**Som for Y_1 er dette likevel ikke lenger avgjørende for framskrivningen**:
+`hovedmodell_slope` brukes nå ALLTID, ankret ved 2025-nivået (se pkt. 7),
+slik at fortegnsproblemet ikke kan påvirke framskrivningen uansett hvilken
+modell som passer best på rå CV.
 
 **2010 er IKKE utelatt** for denne variabelen - sjekket spesifikt og ikke
 funnet noe tilsvarende avvik (se beslutningslogg pkt. 1).
@@ -184,9 +198,10 @@ u_k ~ N(0, σ_u²),  ε_kt ~ N(0, σ_ε²)
 
 God prediktiv treffsikkerhet, på linje med Y_1/Y_2*. Helningsvarianten:
 103/357 kommuner med negativ effektiv helning (korrelert), men bare 10/357
-i den UKORRELERTE varianten - vesentlig bedre enn for de andre variablene,
-men intercept-only brukes likevel til framskrivning, i tråd med
-prosjektets generelle policy.
+i den UKORRELERTE varianten - vesentlig bedre enn for de andre variablene.
+Framskrivning bruker likevel samme ankrede `hovedmodell_slope`-metode som
+Y_1/Y_2* (se pkt. 7), for konsistens og fordi ankringen uansett gjør
+fortegnsproblemet irrelevant for selve framskrivningen.
 
 **Datadekning**: kun 2015-2025 (11 år) har faktiske observasjoner - 2007-
 2014 mangler helt i datagrunnlaget. Modellen er derfor trent på et
@@ -280,14 +295,99 @@ samme som `T = 0`). Se kommentarblokken ved `framskriv_trend()` i `app.R`.
 -variabelen i skriptene kan endres til `"Personer1"` (LLML) eller
 `"Personer2"` (HHMH) for å beregne alternative scenarioer.
 
-## 8. Kjente begrensninger / videre arbeid
+## 8. Kvantifisering av usikkerhet (`usikkerhet_y1.R`, `usikkerhet_y2_stjerne.R`, `usikkerhet_y5.R`)
 
-- Ingen konfidens- eller prediksjonsintervall er beregnet ennå (bare
-  punktestimater).
-- Kun ett befolkningsscenario (MMMM) er beregnet.
+**Metode**: Bayesiansk bootstrap PÅ KOMMUNE-NIVÅ, ikke radnivå - dette
+respekterer panelstrukturen (en kommune, ikke en kommune-år-rad, er
+enheten som varieres, siden radene innad i en kommune deler samme
+tilfeldige kommuneeffekt).
+
+For hver av R = 60 iterasjoner:
+
+1. **Trekk vekter**: for K kommuner i modelldata, trekk `g_1, ..., g_K`
+   uavhengig fra `Gamma(1, 1)` (= `Exponential(1)`), og normaliser:
+
+   ```
+   w_k = (g_k / Σ_j g_j) × K
+   ```
+
+   `g_k / Σ_j g_j` er en eksakt Dirichlet(1,...,1)-trekning (flat prior på
+   simpleksen). Multiplikasjonen med K skalerer opp fra gjennomsnitt 1/K
+   til gjennomsnitt 1 - nødvendig fordi `glmer`/`lmer` tolker `weights`
+   som presisjonsvekter (en vekt på ~1/K ville kunstig blåst opp den
+   estimerte residual-/tilfeldig-effekt-variansen), ikke som
+   sannsynlighetsvekter. Skaleringen endrer ikke selve Dirichlet-
+   fordelingens relative form, bare dens skala.
+
+2. **Refit**: `w_k` tildeles til ALLE rader for kommune k, og
+   `hovedmodell_slope` (samme `FORMEL_SLOPE` som i `modell_<variabel>.R`)
+   refittes med disse som `weights` i `glmer`/`lmer`.
+
+3. **Framskriv**: den refittede modellens koeffisienter og tilfeldige
+   effekter settes inn i NØYAKTIG samme ankermetode som punktestimatet
+   (pkt. 7) - inkludert samme glidende overgang mot observert 2025-nivå.
+
+4. Resultatet for denne iterasjonen legges til en midlertidig
+   (kommune × år)-matrise HOLDT KUN I MINNET.
+
+**Etter alle R iterasjoner**: 2,5- og 97,5-persentilen beregnes radvis
+(per kommune × år) over de R lagrede framskrivningene - dette gir et 95 %
+konfidensintervall. Persentilene (og punktestimatet fra den ikke-vektede
+modellen) lagres; de R RÅ enkeltframskrivningene lagres ALDRI til disk -
+kun holdt transient i minnet under kjøringen, for å unngå å bygge opp
+store mellomresultatfiler for noe som uansett bare skal oppsummeres til to
+tall per (kommune, år).
+
+**Gjenbruk av befolkningsframskrivning**: `folk_ialt`/`demensandel` for
+2026-2050 er uavhengig av bootstrap-vektene (de kommer fra SSBs
+befolkningsframskrivning, ikke fra modellestimeringen) - hentes fra de
+allerede lagrede `framskrevet_<variabel>.rds`-filene i stedet for på nytt
+fra SSB for hver av de 60 iterasjonene.
+
+**Eksempel** (Y_1, Halden, alle 60 iterasjoner konvergerte):
+
+| År | Punktestimat | 95 % KI |
+|---|---|---|
+| 2026 | 1 086,1 | [1 083,0 - 1 095,7] |
+| 2030 | 1 124,9 | [1 111,0 - 1 155,0] |
+| 2040 | 1 440,1 | [1 341,9 - 1 591,4] |
+| 2050 | 2 043,8 | [1 753,4 - 2 442,2] |
+
+Intervallet er smalt nær 2026 (dominert av den glidende overgangens vekt
+på det observerte, ikke-tilfeldige 2025-nivået) og videre ut mot 2050
+etter hvert som modell-/parameterusikkerheten får dominere.
+
+**Viktig begrensning**: usikkerheten er KUN beregnet for standard-
+framskrivningen (`T` implisitt = 0, dvs. ingen kommunespesifikk trend). Når
+"Bruk kommunens egen trend" er slått på i appen (`T` > 0, se pkt. 7), vises
+IKKE noe usikkerhetsbånd - bootstrap er ikke kjørt for T > 0-varianten.
+Dette er en bevisst avgrensning av omfanget (ikke en bug): trend-varianten
+ble bygget for å "se hvordan resultatet ser ut" først, før eventuell
+usikkerhetskvantifisering utvides til den.
+
+**R = 60** ble valgt som et praktisk startpunkt (se beslutningslogg pkt. 8)
+- kan økes ved å endre `ANTALL_BOOTSTRAP` i hvert `usikkerhet_*.R`-script,
+på bekostning av lengre kjøretid (hvert R-refit av `hovedmodell_slope` tar
+lengre tid enn intercept-only-varianten, pga. flere parametre og en
+korrelert tilfeldig helning).
+
+## 9. Kjente begrensninger / videre arbeid
+
 - `Y_3` er ikke modellert som egen variabel (kun som del av `Y_2*`).
 - `framskriv_y4.R` er ikke skrevet - `Y_4`s svake prediktive treffsikkerhet
   (korrelasjon ~0,74) gjør at videre arbeid her bør vurderes nøye før
-  framskrivning tas i bruk.
+  framskrivning tas i bruk. `Y_4` er heller ikke oppdatert til den nye
+  ankrede slope-metoden (pkt. 7) - bruker fortsatt kun den opprinnelige
+  intercept-only-modellen i `modell_y4.R`, siden ingen framskrivning
+  finnes for denne variabelen ennå.
+- Bootstrap-usikkerhet (pkt. 8) er kun beregnet for `T = 0`
+  (standardframskrivningen) - ikke for den brukerstyrte
+  kommunespesifikke trend-varianten (`T > 0`).
+- Kun ett befolkningsscenario (MMMM) er beregnet - LLML, HHMH og
+  Telemarksforsking sine befolkningsframskrivninger er planlagt, men ikke
+  implementert (se "Om"-fanen i appen).
+- Estimering av TILBUD av sykepleiere (i tillegg til dagens
+  etterspørselsestimat) er planlagt, med metodikk fra SSB-rapporten
+  RAPP 2026/18 (se "Om"-fanen) - ikke påbegynt.
 - LOYO-kryssvalideringens håndtering av årseffekt for utelatt år
   (gjennomsnitt av andre år) er en forenkling - se pkt. 6.

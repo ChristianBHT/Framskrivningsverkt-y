@@ -137,7 +137,9 @@ modellenes formler og estimeringsdetaljer, se
 ## 5. Framskrivning (`framskriv_y1.R`, `framskriv_y2_stjerne.R`, `framskriv_y5.R`)
 
 - Bruker SSBs befolkningsframskrivning, **kun hovedalternativet MMMM**
-  (tabell 12882) foreløpig - LLML/HHMH er ikke beregnet.
+  (tabell 12882) foreløpig - LLML/HHMH og Telemarksforsking sine
+  framskrivninger er planlagt (se punkt 6, "Om"-fanens veikart), men ikke
+  implementert.
 - **Årseffekt for framtidige år**: satt til gjennomsnittet av de
   historiske årseffektene, av samme grunn som i kryssvalideringen (en
   årsdummy-modell har ingen egen koeffisient for et år utenfor
@@ -145,13 +147,42 @@ modellenes formler og estimeringsdetaljer, se
 - **Glidende overgang** (`glatt_overgang()`) fra observert til
   modellbasert nivå, for å unngå brå hopp i grafene ved overgangen fra
   historikk til framskrivning: 90 % vekt på observert 2025-verdi i 2026,
-  lineært ned til 0 % (100 % modell) i 2036. Se
+  lineært avtagende utover. Se
   [teknisk_dokumentasjon.md](teknisk_dokumentasjon.md) for eksakt formel.
+  **OPPDATERT**: opprinnelig nådde vekten 0 % (100 % modell) allerede i
+  2036, men dette ga et synlig KINK i grafene (brukeren observerte det for
+  Y_1 og Y_2*) - fordi vekten hadde en konstant, negativ helning fram til
+  2036 og deretter flat null, en diskontinuitet i STIGNINGSTALLET akkurat
+  ved brytpunktet. Rettet ved å strekke overgangen over HELE
+  framskrivningsperioden (2026-2050) i stedet for bare de første 10
+  årene - vekten når nå 0 % først ved siste framskrevne år. Avveining
+  bevisst akseptert: observert 2025-nivå har nå en god del gjenværende
+  vekt langt inn i perioden (f.eks. ~45-50 % ved 2036, mot 0 % før), dvs.
+  mindre av trajectorien er "ren" kryssvalidert modellframskrivning - men
+  brukeren vurderte dette som et akseptabelt bytte mot å fjerne kinken,
+  siden det uansett er en etterbehandlingsmessig glatting, ikke en endring
+  av selve den statistiske modellen.
 - **Duplisert kode** mellom `framskriv_y1.R`/`framskriv_y2_stjerne.R`/
   `framskriv_y5.R` i stedet for en delt hjelpefil - et bevisst valg for å
   unngå regresjonsrisiko på allerede fungerende kode. Vurder en felles
   hjelpefil hvis flere Y-variabler gjør duplikasjonen upraktisk å
   vedlikeholde.
+- **Kommunespesifikk trend (i appen, ikke i de faste framskriv_*.R-filene)**:
+  en brukerstyrt funksjon i `app.R` (`framskriv_trend()`) som tolker den
+  tilfeldige helningen på `demensandel` per kommune som en
+  kommunespesifikk TREND (f.eks. lokal politikk), og lar brukeren velge
+  hvor mange år (T = 0-10) denne trenden skal fases lineært ut over, før
+  framskrivningen går over til det nasjonale gjennomsnittet. Bygget først
+  for Y_1 alene ("først vil jeg se hvordan resultatet ser ut"), deretter
+  generalisert til Y_2*/Y_5 med samme mekanisme (én generisk funksjon
+  parametrisert på variabel-ID, i stedet for tre kopier - i tråd med
+  app.R sin egen etablerte "variabel-agnostisk"-stil, se punkt 6, i
+  motsetning til skript/-filenes bevisste duplisering).
+  Skrus på med en avkryssingsboks (AV som standard, slik at eksisterende
+  oppførsel/usikkerhetsbånd ikke endres for noen som ikke aktivt velger
+  dette). Se punkt 9 for en reell bug som ble funnet og rettet i
+  forbindelse med denne funksjonen, og for hvorfor `hovedmodell_slope` nå
+  brukes for ALL framskrivning (ikke bare når trend-bryteren er på).
 
 ## 6. Shiny-appen (`app.R`)
 
@@ -174,6 +205,29 @@ modellenes formler og estimeringsdetaljer, se
   metodedokumentasjon finnes i stedet i
   [teknisk_dokumentasjon.md](teknisk_dokumentasjon.md), som ikke er en del
   av selve appen.
+  **Datakilder er et unntak**: "Om"-fanen lister likevel opp hvilke SSB-
+  statistikkbank-tabeller (04686, 12292, 11645, 11924, 14534, 07459,
+  12882) som ligger til grunn - dette regnes ikke som å avsløre
+  MODELLERINGSMETODIKK (statistikkbank-tabellnumre er offentlig
+  informasjon, ikke prosjektets egen analyse), og er nyttig åpenhet for
+  brukere/veiledere om hvor tallene kommer fra.
+- **Variabelnavn i UI**: standardisert til mønsteret "Etterspørsel etter
+  X (enhet)" for alle tre variabler ("hjemmetjenester (brukere)", "bolig
+  (brukere)", "sykepleier (avtalte årsverk)") - mer beskrivende for en
+  ekstern leser enn de opprinnelige "Y_1"/"Y_2\*"/"Y_5"-navnene, som ikke
+  betyr noe utenfor prosjektets egen kode. "Avtalte årsverk" er SSBs egen
+  presise betegnelse (til forskjell fra "utførte årsverk", som også
+  korrigerer for fravær) - brukt her i stedet for det mer generiske
+  "årsverk".
+- **Planlagt videre arbeid (se "Om"-fanen)**: lagt til et konkret veikart-
+  punkt om å estimere TILBUD (ikke bare etterspørsel) av sykepleiere, med
+  metodikk fra SSBs rapport
+  ["Behov for og tilgang på arbeidskraft i offentlig helse og omsorg
+  fremover" (RAPP 2026/18)](https://www.ssb.no/helse/helsetjenester/artikler/behov-for-og-tilgang-pa-arbeidskraft-i-offentlig-helse-og-omsorg-fremover/_/attachment/inline/e35491e6-e7b1-43f0-82f9-726b8b21574e:2475fafc0fdb77314f7751654ffea53725e30f2e/RAPP2026-18.pdf),
+  samt å inkludere LLML- og HHMH-befolkningsframskrivninger fra SSB og
+  befolkningsframskrivninger fra Telemarksforsking som alternativ til
+  SSBs hovedalternativ MMMM. Ingen av disse er påbegynt - kun notert som
+  neste steg.
 
 ## 7. Datavalidering underveis
 
@@ -254,3 +308,31 @@ modellenes formler og estimeringsdetaljer, se
   intercept-only-modellen) for faktisk framskrivning og
   bootstrap-usikkerhet. Punktestimater og bootstrap-CI er begge
   regenerert med den nye metoden.
+
+## 10. Publisering på shinyapps.io (beta)
+
+- **Valg av vertsplattform**: shinyapps.io, gratis-nivå - valgt av
+  brukeren for et raskt, enkelt førsteutkast med en delbar URL til
+  veiledere, uten behov for egen serverdrift. Kjente begrensninger på
+  gratis-nivået: maks 25 aktive timer/måned totalt, appen "sovner" etter
+  ~15 minutters inaktivitet (kort oppstartsforsinkelse ved neste besøk).
+- **Kontosikkerhet**: kontoopprettelse og token-kobling (`rsconnect::
+  setAccountInfo()`) ble gjort av brukeren selv, direkte i egen
+  R-konsoll - IKKE av assistenten, siden dette innebærer å taste inn et
+  hemmelig token/secret. Selve opplastingen (`rsconnect::deployApp()`)
+  kunne gjøres av assistenten etterpå, siden kontoinfo da allerede lå
+  lagret lokalt (ikke noe hemmelig som måtte håndteres videre).
+- **Minimal opplasting, ikke hele prosjektet**: `app.R` bruker i praksis
+  bare 10 av de 65 filene i `data/ssb/` (~4,5 MB av totalt ~144 MB) - de
+  øvrige er mellomresultater fra `skript/`-pipelinen (rå paneldata,
+  CSV-kopier, ikke-slope-modeller, CV-prediksjoner, plott) som appen ikke
+  leser. Løst med en EKSPLISITT fil-liste til `deployApp(appFiles = ...)`
+  i stedet for å laste opp hele mappen.
+  - **`.rscignore` alene var ikke nok**: filen støtter (i motsetning til
+    `.gitignore`) IKKE wildcards eller negasjon - bare ett fast fil-/
+    mappenavn per linje. Brukes derfor bare til å utelate hele mapper
+    (`skript/`, `dokumentasjon/`), mens det fin-kornede utvalget av
+    hvilke `data/ssb/`-filer som skal med, styres av `appFiles`.
+- **`skript/` og `dokumentasjon/` lastes ikke opp** - appen leser dem
+  aldri (se punkt 6), og de har heller ingen verdi for en ekstern bruker
+  av den ferdige appen.
