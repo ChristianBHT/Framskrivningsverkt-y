@@ -1,0 +1,570 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[norsk]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{hyperref}
+\usepackage{xcolor}
+
+\geometry{margin=2.5cm}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.6em}
+\renewcommand{\arraystretch}{1.15}
+
+\title{Teknisk dokumentasjon -- modeller og estimering}
+\author{}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+Dette dokumentet beskriver de statistiske modellene som brukes til å
+framskrive \(Y_1\), \(Y_2^\ast\), \(Y_4\) og \(Y_5\): likninger,
+estimeringsprosedyre, kryssvalideringsresultater og framskrivningsmetode.
+For \textbf{begrunnelsene} bak disse valgene (hvorfor Poisson, hvorfor
+intercept-only, hvorfor 2010 er utelatt for \(Y_1\) osv.), se
+\texttt{beslutningslogg.md}.
+
+\textbf{NB}: Dette dokumentet er bevisst \textbf{ikke} tilgjengelig fra selve
+Shiny-appen (\texttt{app.R}) -- se punkt 6 i beslutningsloggen.
+
+\section{Datagrunnlag}
+
+\begin{table}[htbp]
+\centering
+\small
+\begin{tabularx}{\textwidth}{
+    >{\raggedright\arraybackslash}p{1.2cm}
+    >{\raggedright\arraybackslash}X
+    >{\raggedright\arraybackslash}p{3.3cm}
+    >{\raggedleft\arraybackslash}p{2.1cm}
+    >{\raggedleft\arraybackslash}p{1.6cm}}
+\toprule
+\textbf{Variabel} & \textbf{Definisjon} & \textbf{Estimeringsperiode} &
+\textbf{Kommune-år (N)} & \textbf{Kommuner} \\
+\midrule
+\(Y_1\) &
+Brukere av hjemmetjenester, i alt &
+2007--2025, ekskl. 2010 &
+6\,337 & 357 \\
+
+\(Y_2^\ast\) &
+\(Y_2\) (heldøgnsbolig) + \(Y_{3a}\) (institusjon, langtid), i alt &
+2007--2025 &
+5\,167 & 355 \\
+
+\(Y_4\) &
+Gjennomsnittlig timer/uke, hjemmetjenester &
+2007--2025 &
+6\,329 & 357 \\
+
+\(Y_5\) &
+Sykepleiere, årsverk i alt &
+2015--2025 (mangler helt 2007--2014) &
+3\,898 & 357 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Alle modeller bruker
+\[
+\texttt{demensandel}
+=
+\frac{\texttt{demens\_estimert}}{\texttt{folk\_ialt}}
+\]
+(se \texttt{legg\_til\_demens.R}) og en tilfeldig kommuneeffekt over
+\texttt{kommunenr\_2024} (2024-kommunestruktur, se
+\texttt{hent\_paneldata\_2007\_2025.R}).
+
+Demensestimatet beregnes som:
+\[
+\widehat{\text{demens}}_{k,t}
+=
+\sum_{a,s}
+\left[
+N_{a,s,k,t}\,
+p_{a,s}
+\right],
+\]
+der \(a\) angir alder, \(s\) kjønn, \(N_{a,s,k,t}\) er befolkningen i
+alders-/kjønnsgruppe \(a,s\) i kommune \(k\) og år \(t\), og \(p_{a,s}\)
+er den tilhørende prevalensraten.
+
+Med variabelnavnene fra koden kan dette skrives som
+\[
+\texttt{demens\_estimert(kommune, år)}
+=
+\sum_{\text{alder, kjønn}}
+\left[
+\texttt{befolkning(alder, kjønn, kommune, år)}
+\times
+\texttt{prevalensrate(alder, kjønn)}
+\right].
+\]
+
+Prevalensratene er faste, aldersgruppe- og kjønnsspesifikke andeler
+(se \texttt{dementia\_dic} i \texttt{legg\_til\_demens.R}).
+
+\section{Modell \(Y_1\) -- hjemmetjenestebrukere
+(\texttt{modell\_y1.R})}
+
+\textbf{Type}: Poisson generalisert lineær blandet modell
+(\texttt{lme4::glmer}, log-lenke), med befolkning som eksponering
+(offset).
+
+\subsection*{Likning (hovedmodell)}
+
+\begin{align}
+Y_{1,a,\mathrm{ialt},k,t}
+&\sim \operatorname{Poisson}(\mu_{kt}), \\
+\log(\mu_{kt})
+&=
+\log(\texttt{folk\_ialt}_{kt})
++\beta_0
++\sum_t \gamma_t\,\text{år}_t
++\beta_1\,\texttt{demensandel}_{kt}
++u_k, \\
+u_k &\sim \mathcal{N}(0,\sigma_u^2).
+\end{align}
+
+\subsection*{Estimerte parametre}
+
+Hovedmodell, alle tilgjengelige år unntatt 2010:
+
+\begin{table}[htbp]
+\centering
+\begin{tabularx}{0.9\textwidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{5.2cm}}
+\toprule
+\textbf{Parameter} & \textbf{Estimat} \\
+\midrule
+Intercept (\(\beta_0\)) & \(-3{,}832\) \\
+\texttt{demensandel} (\(\beta_1\)) & \(34{,}02\) \\
+Årseffekter (\(\gamma_t\)) &
+spenner fra \(-0{,}047\) (2025) til \(0{,}059\) (2009), relativt til 2007 \\
+Kommune-tilfeldig-intercept, SD (\(\sigma_u\)) & \(0{,}188\) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Kryssvalidering}
+
+Leave-one-year-out, alle år:
+
+\begin{table}[htbp]
+\centering
+\begin{tabularx}{0.9\textwidth}{
+    >{\raggedright\arraybackslash}X
+    >{\raggedleft\arraybackslash}p{1.7cm}
+    >{\raggedleft\arraybackslash}p{1.7cm}
+    >{\raggedleft\arraybackslash}p{2.2cm}}
+\toprule
+\textbf{Modellvariant} & \textbf{RMSE} & \textbf{MAE} & \textbf{Korrelasjon} \\
+\midrule
+Kun tilfeldig intercept (brukt til framskrivning) & 104,9 & 51,4 & 0,9964 \\
+Intercept + korrelert helning på \texttt{demensandel} & 68,0 & 34,2 & 0,9985 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Helningsvarianten gir 91 av 357 kommuner en negativ effektiv helning på
+\texttt{demensandel} -- derfor brukes intercept-only-modellen til
+framskrivning, selv om helningsvarianten scorer bedre på CV
+(se beslutningslogg pkt. 3).
+
+\textbf{2010 er utelatt} fra estimeringsdataene for denne variabelen
+(se beslutningslogg pkt. 1).
+
+\section{Modell \(Y_2^\ast\) -- heldøgns omsorg
+(\texttt{modell\_y2\_stjerne.R})}
+
+\textbf{Type}: samme struktur som \(Y_1\) (Poisson GLMM, log-lenke,
+befolkning som offset).
+
+\subsection*{Likning}
+
+\begin{align}
+Y_{2^\ast,\mathrm{ialt},k,t}
+&\sim \operatorname{Poisson}(\mu_{kt}), \\
+\log(\mu_{kt})
+&=
+\log(\texttt{folk\_ialt}_{kt})
++\beta_0
++\sum_t \gamma_t\,\text{år}_t
++\beta_1\,\texttt{demensandel}_{kt}
++u_k .
+\end{align}
+
+der
+\[
+\texttt{Y\_2\_stjerne\_ialt}
+=
+\texttt{Y\_2\_ialt}
++
+\texttt{Y\_3\_a\_ialt}.
+\]
+
+\subsection*{Estimerte parametre}
+
+Hovedmodell, alle år 2007--2025:
+
+\begin{table}[htbp]
+\centering
+\begin{tabularx}{0.9\textwidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{5.2cm}}
+\toprule
+\textbf{Parameter} & \textbf{Estimat} \\
+\midrule
+Intercept (\(\beta_0\)) & \(-4{,}956\) \\
+\texttt{demensandel} (\(\beta_1\)) & \(30{,}80\) \\
+Årseffekter (\(\gamma_t\)) &
+monotont fallende fra 2010 (\(0{,}003\)) til 2025 (\(-0{,}171\)),
+relativt til 2009 \\
+Kommune-tilfeldig-intercept, SD (\(\sigma_u\)) & \(0{,}260\) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Kryssvalidering}
+
+Leave-one-year-out, alle år:
+
+\begin{table}[htbp]
+\centering
+\begin{tabularx}{0.9\textwidth}{
+    >{\raggedright\arraybackslash}X
+    >{\raggedleft\arraybackslash}p{1.7cm}
+    >{\raggedleft\arraybackslash}p{1.7cm}
+    >{\raggedleft\arraybackslash}p{2.2cm}}
+\toprule
+\textbf{Modellvariant} & \textbf{RMSE} & \textbf{MAE} & \textbf{Korrelasjon} \\
+\midrule
+Kun tilfeldig intercept (brukt til framskrivning) & 35,7 & 19,2 & 0,9968 \\
+Intercept + korrelert helning på \texttt{demensandel} & 46,4 & 20,7 & 0,9950 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Her er intercept-only-modellen faktisk \textbf{best} på kryssvalidering i
+tillegg til å unngå fortegnsproblemet (95/355 kommuner med negativ
+effektiv helning i den korrelerte helningsvarianten, 78/355 i den
+ukorrelerte).
+
+\textbf{2010 er ikke utelatt} for denne variabelen -- sjekket spesifikt og
+ikke funnet noe tilsvarende avvik (se beslutningslogg pkt. 1).
+
+\section{Modell \(Y_4\) -- timer/uke (\texttt{modell\_y4.R})}
+
+\textbf{Type}: lineær blandet modell (\texttt{lme4::lmer},
+identitetslenke) -- \textbf{ikke} Poisson, siden \(Y_4\) allerede er et
+gjennomsnitt (timer/uke per bruker), ikke et antall. Ingen offset.
+
+\subsection*{Likning}
+
+\begin{align}
+Y_{4,\mathrm{ialt},k,t}
+&=
+\beta_0
++\sum_t \gamma_t\,\text{år}_t
++\beta_1\,\texttt{demensandel}_{kt}
++u_k+\varepsilon_{kt}, \\
+u_k &\sim \mathcal{N}(0,\sigma_u^2), \\
+\varepsilon_{kt} &\sim \mathcal{N}(0,\sigma_\varepsilon^2).
+\end{align}
+
+\subsection*{Estimerte parametre}
+
+Hovedmodell, alle år 2007--2025:
+
+\begin{table}[htbp]
+\centering
+\begin{tabularx}{0.9\textwidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{5.2cm}}
+\toprule
+\textbf{Parameter} & \textbf{Estimat} \\
+\midrule
+Intercept (\(\beta_0\)) & \(4{,}093\) \\
+\texttt{demensandel} (\(\beta_1\)) & \(-0{,}899\) \\
+Årseffekter (\(\gamma_t\)) &
+stigende fra 2009 (\(0{,}460\)) til 2022 (\(1{,}022\)),
+noe fallende mot 2025 (\(0{,}937\)) \\
+Kommune-tilfeldig-intercept, SD (\(\sigma_u\)) & \(2{,}105\) \\
+Residual-SD (\(\sigma_\varepsilon\)) & \(1{,}774\) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Kryssvalidering}
+
+Leave-one-year-out, alle år:
+
+\begin{table}[htbp]
+\centering
+\begin{tabularx}{0.9\textwidth}{
+    >{\raggedright\arraybackslash}X
+    >{\raggedleft\arraybackslash}p{1.7cm}
+    >{\raggedleft\arraybackslash}p{1.7cm}
+    >{\raggedleft\arraybackslash}p{2.2cm}}
+\toprule
+\textbf{Modellvariant} & \textbf{RMSE} & \textbf{MAE} & \textbf{Korrelasjon} \\
+\midrule
+Kun tilfeldig intercept (brukt til framskrivning) & 1,77 & 1,20 & 0,736 \\
+Intercept + korrelert helning på \texttt{demensandel} & 1,53 & 0,98 & 0,813 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Vesentlig svakere prediktiv treffsikkerhet enn de øvrige variablene
+(forventet -- se \texttt{modell\_y4.R}s egen kommentar om at \(Y_4\) er et
+gjennomsnitt beregnet over få brukere i mange, særlig små, kommuner).
+Helningsvarianten har et enda mer utbredt fortegnsproblem enn de andre
+variablene: 195/357 kommuner (korrelert) / 192/357 (ukorrelert) får en
+negativ effektiv helning på \texttt{demensandel}.
+
+\textbf{Forkastet variant}: \texttt{Y\_1\_a\_ialt} (antall
+hjemmetjenestemottakere) ble testet som en ekstra, rå forklaringsvariabel
+på oppfordring. Ga ingen meningsfull forbedring i CV-korrelasjon
+(\(\sim 0{,}735\) med og uten), og fikk \texttt{demensandel}s koeffisient
+til å bli enda mer negativ -- et tegn på at \texttt{Y\_1\_a\_ialt} i stor
+grad fanger opp kommunestørrelse (kollinearitet), ikke en selvstendig
+effekt. Ikke tatt i bruk. Koden for dette forsøket ligger fortsatt i
+\texttt{modell\_y4.R} (kommentert inn i formlene), men brukes ikke i
+\texttt{framskriv\_y4.R} (som ikke er skrevet ennå).
+
+\section{Modell \(Y_5\) -- sykepleierårsverk (\texttt{modell\_y5.R})}
+
+\textbf{Type}: lineær blandet modell (\texttt{lme4::lmer}) på
+\textbf{logaritmen} av \(Y_5\), med befolkning som offset (koeffisient
+tvunget til 1) -- samme multiplikative populasjonsskalering som
+Poisson-modellene for \(Y_1/Y_2^\ast\), men med normalfordelte feil på
+logskala i stedet for Poisson-varians, siden årsverk ikke er et heltall.
+
+\subsection*{Likning}
+
+\begin{align}
+\log(Y_{5,\mathrm{ialt},k,t})
+&=
+\log(\texttt{folk\_ialt}_{kt})
++\beta_0
++\sum_t \gamma_t\,\text{år}_t
++\beta_1\,\texttt{demensandel}_{kt}
++u_k+\varepsilon_{kt}, \\
+u_k &\sim \mathcal{N}(0,\sigma_u^2), \\
+\varepsilon_{kt} &\sim \mathcal{N}(0,\sigma_\varepsilon^2).
+\end{align}
+
+\subsection*{Estimerte parametre}
+
+Hovedmodell, alle år 2015--2025:
+
+\begin{table}[htbp]
+\centering
+\begin{tabularx}{0.9\textwidth}{>{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{5.2cm}}
+\toprule
+\textbf{Parameter} & \textbf{Estimat} \\
+\midrule
+Intercept (\(\beta_0\)) & \(-5{,}256\) \\
+\texttt{demensandel} (\(\beta_1\)) & \(13{,}83\) \\
+Årseffekter (\(\gamma_t\)) &
+stigende fra 2016 (\(0{,}016\)) til 2020 (\(0{,}070\)),
+fallende mot 2025 (\(0{,}031\)), relativt til 2015 \\
+Kommune-tilfeldig-intercept, SD (\(\sigma_u\)) & \(0{,}264\) \\
+Residual-SD (\(\sigma_\varepsilon\)) & \(0{,}107\) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\subsection*{Kryssvalidering}
+
+Leave-one-year-out, alle 11 år:
+
+\begin{table}[htbp]
+\centering
+\begin{tabularx}{0.9\textwidth}{
+    >{\raggedright\arraybackslash}X
+    >{\raggedleft\arraybackslash}p{1.7cm}
+    >{\raggedleft\arraybackslash}p{1.7cm}
+    >{\raggedleft\arraybackslash}p{2.2cm}}
+\toprule
+\textbf{Modellvariant} & \textbf{RMSE} & \textbf{MAE} & \textbf{Korrelasjon} \\
+\midrule
+Kun tilfeldig intercept (brukt til framskrivning) & 13,9 & 5,6 & 0,9975 \\
+Intercept + korrelert helning på \texttt{demensandel} & 12,7 & 4,9 & 0,9979 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+God prediktiv treffsikkerhet, på linje med \(Y_1/Y_2^\ast\).
+Helningsvarianten: 103/357 kommuner med negativ effektiv helning
+(korrelert), men bare 10/357 i den \textbf{ukorrelerte} varianten --
+vesentlig bedre enn for de andre variablene, men intercept-only brukes
+likevel til framskrivning, i tråd med prosjektets generelle policy.
+
+\textbf{Datadekning}: kun 2015--2025 (11 år) har faktiske observasjoner --
+2007--2014 mangler helt i datagrunnlaget. Modellen er derfor trent på et
+vesentlig kortere tidsvindu enn de andre variablene.
+
+\section{Kryssvalideringsmetode (gjelder alle modeller)}
+
+Leave-one-year-out (LOYO): for hvert år \(t\) i datasettet estimeres
+modellen på \textbf{alle andre år}, og brukes til å predikere år \(t\).
+Siden alle modellene har årsdummyer (\texttt{år\_f}), har den
+re-estimerte modellen per definisjon ingen egen koeffisient for det
+utelatte året. Dette løses med en forenkling:
+\[
+\gamma_t^{(\text{utelatt år})}
+\approx
+\operatorname{gjennomsnitt}
+\left(
+\gamma_s:\; s \neq t
+\right).
+\]
+
+Dette er en tilnærming, ikke en eksakt løsning -- se
+\texttt{loyo\_cv()}-funksjonen i hvert \texttt{modell\_*.R}-script.
+RMSE, MAE og korrelasjon rapporteres både per utelatt år og samlet over
+alle utelatte år.
+
+\section{Framskrivningsmetode
+(\texttt{framskriv\_y1.R}, \texttt{framskriv\_y2\_stjerne.R},
+\texttt{framskriv\_y5.R})}
+
+\textbf{Oppdatert metode (rettet policy -- se beslutningslogg.md,
+``Retur til slope-modell'')}: Punktestimatet bruker nå
+\texttt{hovedmodell\_slope} (tilfeldig intercept \textbf{og} helning på
+\texttt{demensandel} per kommune), \textbf{ankret} ved kommunens siste
+observerte (2025) demensandel -- \textbf{ikke} en separat
+intercept-only-modell som tidligere. Se punkt 2 i denne oppdateringen for
+hvorfor.
+
+\subsection*{Trinn}
+
+\begin{enumerate}[leftmargin=*,label=\arabic*.]
+\item Hent SSBs befolkningsframskrivning (tabell 12882, hovedalternativ
+MMMM = \texttt{ContentsCode = "Personer"}) for 2026--2050, per kommune,
+alder og kjønn.
+
+\item Beregn framskrevet \texttt{demensandel} med \textbf{samme}
+prevalensrater som i historikken.
+
+\item Predikér med \texttt{hovedmodell\_slope}, \textbf{ankret} ved
+kommunens siste observerte (2025) demensandel (\(a_k\)). Årseffekten for
+et framtidig år settes til gjennomsnittet av de historiske årseffektene,
+som før. La \(u_{k0}\) og \(u_{k1}\) være kommunens tilfeldige intercept
+og helning:
+\begin{align}
+\mathrm{intercept}'_k
+&=
+\beta_0+u_{k0}+(\beta_1+u_{k1})a_k,
+\\
+\widehat{y}_{kt}
+&=
+\exp\left[
+\mathrm{intercept}'_k
++\overline{\gamma}
++\beta_1\bigl(
+\texttt{demensandel}_{kt}-a_k
+\bigr)
++\log(\texttt{folk\_ialt}_{kt})
+\right].
+\end{align}
+
+\textbf{Hvorfor ankring, og hvorfor dette gjør slope-modellen trygg å
+bruke}: \(\mathrm{intercept}'_k\) er en \textbf{konstant} (bygget fra
+modellens fit ved ankeret) og kan derfor ikke selv eksplodere. All
+\textbf{framtidig} vekst i demensandel bruker bare det faste, nasjonale
+helningsanslaget \(\beta_1\) -- aldri kommunens egen tilfeldige helning
+\(u_{k1}\). Det er nettopp bruken av \(u_{k1}\) på framtidig vekst som
+tidligere ga et implausibelt fortegn for en andel kommuner (se pkt. 3 i
+hoveddokumentet). Siden \(u_{k1}\) her bare multipliserer et fast
+historisk ankerpunkt (ikke en økende framtidig størrelse), er denne faren
+eliminert.
+
+Uten ankring -- dvs. å bruke
+\(u_{k1}\cdot\texttt{demensandel}_{kt}\) direkte, eller å bytte mellom en
+egen intercept-only-modell og denne modellen -- oppstår et reelt
+inkonsistensproblem: de to modellvariantene har ulike faste effekter
+(\(\beta_0,\beta_1\)). Et brukergrensesnitt som lar brukeren ``slå av''
+en tilfeldig-helning-effekt ved å bytte til en annen modell vil derfor
+vise et synlig sprang selv når effekten skulle vært 0\,\%. Dette ble
+funnet som en reell bug i appen og rettet ved å alltid bruke
+\texttt{hovedmodell\_slope}, aldri en egen intercept-only-modell, for
+framskrivning.
+
+\item \textbf{Glidende overgang} fra observert 2025-nivå til
+modellframskrivning, for å unngå brå hopp i grafene ved skjøten mellom
+historikk og framskrivning. Overgangen er nå strukket over
+\textbf{hele framskrivningsperioden} (2026--2050) i stedet for bare de
+første 10 årene, for å unngå et kink i grafen der overgangsvekten
+tidligere flatet ut brått til 0 i 2036:
+\begin{align}
+w_t
+&=
+\max\left(
+0,\;
+0{,}9\frac{2050-t}{2050-2026}
+\right),
+\qquad t=2026,\ldots,2050,
+\\
+y_{\mathrm{predikert},t}
+&=
+w_t\,y_{\mathrm{observert},2025}
++
+(1-w_t)\widehat{y}_{kt}.
+\end{align}
+
+Dette gir 90\,\% vekt på observert 2025-nivå i 2026, lineært avtagende
+til 0\,\% (100\,\% modell) først i 2050 (siste framskrevne år). Se
+\texttt{glatt\_overgang()} i hvert \texttt{framskriv\_*.R}-script.
+NB: Dette betyr at observert 2025-nivå har en god del gjenværende vekt
+langt inn i perioden (f.eks. \(\sim 45\)--50\,\% ved 2036) -- en bevisst
+avveining mellom å unngå kink-artefaktet og hvor lenge ett enkelt
+historisk datapunkt påvirker framskrivningen.
+\end{enumerate}
+
+\subsection*{Kommunespesifikk trend (appen)}
+
+\texttt{app.R} sin \texttt{framskriv\_trend()} bruker nøyaktig samme
+ankermetode som over, men med en brukerstyrt vekt
+\[
+\texttt{vekt\_trend}(t)
+=
+\max\left(
+0,\;
+\frac{T-(t-2026)}{T}
+\right)
+\]
+multiplisert med \(u_{k1}\), i stedet for at helningsbidraget alltid er 0.
+Dette er en generalisering av pkt. 3; ``standardvisningen'' i appen er
+nøyaktig det samme som \(T=0\). Se kommentarblokken ved
+\texttt{framskriv\_trend()} i \texttt{app.R}.
+
+\subsection*{Befolkningsscenario}
+
+Kun ett befolkningsscenario (MMMM) er beregnet så langt.
+\texttt{ALTERNATIV}-variabelen i skriptene kan endres til
+\texttt{"Personer1"} (LLML) eller \texttt{"Personer2"} (HHMH) for å
+beregne alternative scenarioer.
+
+\section{Kjente begrensninger / videre arbeid}
+
+\begin{itemize}[leftmargin=*]
+\item Ingen konfidens- eller prediksjonsintervall er beregnet ennå
+(bare punktestimater).
+\item Kun ett befolkningsscenario (MMMM) er beregnet.
+\item \(Y_3\) er ikke modellert som egen variabel (kun som del av
+\(Y_2^\ast\)).
+\item \texttt{framskriv\_y4.R} er ikke skrevet --
+\(Y_4\)s svake prediktive treffsikkerhet (korrelasjon \(\sim 0{,}74\))
+gjør at videre arbeid her bør vurderes nøye før framskrivning tas i bruk.
+\item LOYO-kryssvalideringens håndtering av årseffekt for utelatt år
+(gjennomsnitt av andre år) er en forenkling -- se pkt. 6.
+\end{itemize}
+
+\end{document}

@@ -209,40 +209,72 @@ utelatt år og samlet over alle utelatte år.
 
 ## 7. Framskrivningsmetode (`framskriv_y1.R`, `framskriv_y2_stjerne.R`, `framskriv_y5.R`)
 
+**OPPDATERT METODE (rettet policy - se beslutningslogg.md, "Retur til
+slope-modell")**: punktestimatet bruker nå `hovedmodell_slope` (tilfeldig
+intercept OG helning på demensandel per kommune), ANKRET ved kommunens
+siste observerte (2025) demensandel - IKKE en separat intercept-only-modell
+som tidligere. Se punkt 2 i denne oppdateringen for hvorfor.
+
 **Trinn**:
 
 1. Hent SSBs befolkningsframskrivning (tabell 12882, hovedalternativ
    MMMM = `ContentsCode = "Personer"`) for 2026-2050, per kommune, alder
    og kjønn.
 2. Beregn framskrevet `demensandel` med SAMME prevalensrater som i
-   historikken (pkt. 1).
-3. Predikér med hovedmodellen (kun tilfeldig intercept), med samme
-   linear-prediktor-formel som i CV-en, men der årseffekten for et
-   framtidig år også settes til gjennomsnittet av de historiske
-   årseffektene:
+   historikken.
+3. Predikér med `hovedmodell_slope`, ANKRET ved kommunens siste observerte
+   (2025) demensandel (`a_k`). Årseffekten for et framtidig år settes til
+   gjennomsnittet av de historiske årseffektene, som før. La `u_k0` og
+   `u_k1` være kommunens tilfeldige intercept og helning:
 
-   For Y_1/Y_2* (Poisson-skala):
    ```
-   ŷ_kt = exp( β_0 + gjennomsnitt(γ_t) + β_1 · demensandel_kt + u_k + log(folk_ialt_kt) )
+   intercept'_k = β_0 + u_k0 + (β_1 + u_k1) · a_k        (konstant per kommune)
+   ŷ_kt = exp( intercept'_k + gjennomsnitt(γ_t) + β_1 · (demensandel_kt - a_k) + log(folk_ialt_kt) )
    ```
-   For Y_5 (log-lineær skala, samme form siden begge eksponensierer en
-   log-lineær prediktor med offset):
-   ```
-   ŷ_kt = exp( β_0 + gjennomsnitt(γ_t) + β_1 · demensandel_kt + u_k + log(folk_ialt_kt) )
-   ```
+
+   **Hvorfor ankring, og hvorfor dette gjør slope-modellen TRYGG å bruke**:
+   `intercept'_k` er en KONSTANT (bygget fra modellens fit VED ankeret) og
+   kan derfor ikke selv eksplodere. All FRAMTIDIG vekst i demensandel
+   bruker BARE det faste, nasjonale helningsanslaget β_1 - ALDRI kommunens
+   egen tilfeldige helning `u_k1`. Det er nettopp bruken av `u_k1` på
+   FRAMTIDIG vekst som tidligere ga et implausibelt fortegn for en andel
+   kommuner (se pkt. 3 i hoveddokumentet) - siden `u_k1` her bare
+   multipliserer et FAST historisk ankerpunkt (ikke en økende fremtidig
+   størrelse), er denne faren eliminert.
+   Uten ankring - dvs. å bruke `u_k1 · demensandel_kt` direkte, eller å
+   bytte mellom en egen intercept-only-modell og denne modellen - oppstår
+   et reelt inkonsistens-problem: de to modellvariantene har ULIKE faste
+   effekter (β_0, β_1), så et brukergrensesnitt som lar brukeren "slå av"
+   en tilfeldig-helning-effekt ved å bytte til en ANNEN modell vil vise et
+   synlig sprang selv når effekten skulle vært 0 %. Dette ble funnet som en
+   reell bug i appen og rettet ved å ALLTID bruke `hovedmodell_slope`,
+   aldri en egen intercept-only-modell, for framskrivning.
 
 4. **Glidende overgang** fra observert 2025-nivå til modellframskrivning,
    for å unngå brå hopp i grafene ved skjøten mellom historikk og
-   framskrivning:
+   framskrivning - nå strukket over HELE framskrivningsperioden (2026-2050)
+   i stedet for bare de første 10 årene, for å unngå et kink i grafen der
+   overgangsvekten tidligere flatet ut brått til 0 i 2036:
 
    ```
-   vekt_t = max(0, 0.9 × (2036 - t) / (2036 - 2026))   for t = 2026..2050
+   vekt_t = max(0, 0.9 × (2050 - t) / (2050 - 2026))   for t = 2026..2050
    y_predikert_t = vekt_t × y_observert_2025 + (1 - vekt_t) × ŷ_kt
    ```
 
    Dette gir 90 % vekt på observert 2025-nivå i 2026, lineært avtagende
-   til 0 % (100 % modell) i 2036, og deretter ren modellframskrivning for
-   2037-2050. Se `glatt_overgang()` i hvert `framskriv_*.R`-script.
+   til 0 % (100 % modell) først i 2050 (siste framskrevne år). Se
+   `glatt_overgang()` i hvert `framskriv_*.R`-script. NB: dette betyr at
+   observert 2025-nivå har en god del gjenværende vekt langt inn i
+   perioden (f.eks. ~45-50 % ved 2036) - en bevisst avveining mellom å
+   unngå kink-artefaktet og hvor lenge ett enkelt historisk datapunkt
+   påvirker framskrivningen.
+
+**Kommunespesifikk trend (appen)**: `app.R` sin `framskriv_trend()` bruker
+NØYAKTIG samme ankermetode som over, men med en brukerstyrt vekt
+`vekt_trend(t) = max(0, (T - (t - 2026)) / T)` multiplisert med `u_k1` i
+stedet for helningsbidraget alltid værende 0 (dvs. dette er en
+generalisering av pkt. 3 - "standardvisningen" i appen er nøyaktig det
+samme som `T = 0`). Se kommentarblokken ved `framskriv_trend()` i `app.R`.
 
 **Kun ett befolkningsscenario** (MMMM) er beregnet så langt - `ALTERNATIV`
 -variabelen i skriptene kan endres til `"Personer1"` (LLML) eller

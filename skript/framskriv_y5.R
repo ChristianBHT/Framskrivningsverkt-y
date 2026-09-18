@@ -149,23 +149,14 @@ beregn_demens_framskrevet <- function(befolkning_fremtid, rater = dementia_dic) 
 }
 
 ## ============================================================================
-## 5. Predikér Y_5 med hovedmodell
+## 5. Predikér Y_5 med hovedmodell_slope, ANKRET ved 2025-nivået
 ## ============================================================================
-re_bidrag <- function(modell, gruppevar, nydata) {
-  re_df <- ranef(modell)[[gruppevar]]
-  grupper <- as.character(nydata[[gruppevar]])
-  bidrag <- numeric(nrow(nydata))
-  for (kolonne in names(re_df)) {
-    verdier <- re_df[grupper, kolonne]
-    if (identical(kolonne, "(Intercept)")) {
-      bidrag <- bidrag + verdier
-    } else {
-      bidrag <- bidrag + verdier * nydata[[kolonne]]
-    }
-  }
-  bidrag
-}
-
+## Se framskriv_y1.R for full begrunnelse: bruker BEVISST hovedmodell_slope
+## (ikke en separat intercept-only-modell), ankret ved kommunens siste
+## observerte (2025) demensandel, slik at "trend-effekt = 0 %" i appen gir
+## nøyaktig samme tall som når trend-bryteren er av. Kommunens egen
+## tilfeldige helning brukes ALDRI på framtidig vekst her - bare på det
+## faste ankerpunktet.
 framskriv_y5 <- function(modell, framtidsdata) {
   faste <- fixef(modell)
   intercept <- faste[["(Intercept)"]]
@@ -173,7 +164,8 @@ framskriv_y5 <- function(modell, framtidsdata) {
   aar_koef <- faste[grepl("^år_f", names(faste))]
   aar_effekt_framskrevet <- mean(aar_koef)
 
-  kjente_kommuner <- rownames(ranef(modell)$kommunenr_2024)
+  re <- ranef(modell)$kommunenr_2024
+  kjente_kommuner <- rownames(re)
   kjent <- as.character(framtidsdata$kommunenr_2024) %in% kjente_kommuner
   if (!all(kjent)) {
     warning(sum(!kjent), " kommune(r) fantes ikke i modellens treningsdata ",
@@ -181,12 +173,18 @@ framskriv_y5 <- function(modell, framtidsdata) {
     framtidsdata <- framtidsdata[kjent, ]
   }
 
+  u_intercept <- re[as.character(framtidsdata$kommunenr_2024), "(Intercept)"]
+  u_slope <- re[as.character(framtidsdata$kommunenr_2024), "demensandel"]
+
   ## Samme log-lineær-med-offset-form som modellestimeringen (se modell_y5.R):
   ## lin_pred er log(Y_5), så prediksjonen eksponensieres tilbake til
   ## opprinnelig skala (årsverk).
-  lin_pred <- intercept + aar_effekt_framskrevet +
-    demens_koef * framtidsdata$demensandel +
-    re_bidrag(modell, "kommunenr_2024", framtidsdata) +
+  intercept_prime <- intercept + u_intercept +
+    (demens_koef + u_slope) * framtidsdata$demensandel_anker
+  delta_demensandel <- framtidsdata$demensandel - framtidsdata$demensandel_anker
+
+  lin_pred <- intercept_prime + aar_effekt_framskrevet +
+    demens_koef * delta_demensandel +
     log(framtidsdata$folk_ialt)
 
   framtidsdata$y5_predikert <- as.numeric(exp(lin_pred))
@@ -198,8 +196,11 @@ framskriv_y5 <- function(modell, framtidsdata) {
 ## ============================================================================
 ## Samme skjema som framskriv_y1.R/framskriv_y2_stjerne.R: 90 % vekt på
 ## observert 2025 i 2026, lineært ned til 0 % i 2036.
+## SLUTTAAR_OVERGANG settes til siste framskrevne år lenger ned (etter at
+## AR_FRAMOVER er definert) - overgangen strekkes over HELE
+## framskrivningsperioden, ikke bare 2026-2036, for å unngå et kink i grafen
+## (se framskriv_y1.R for full begrunnelse).
 STARTAAR_OVERGANG <- 2026
-SLUTTAAR_OVERGANG <- 2036
 START_ANDEL_OBSERVERT <- 0.9
 
 glatt_overgang <- function(framskrevet_raa, siste_observert) {
@@ -227,12 +228,24 @@ for (pakke in c("httr2", "lme4", "dplyr", "tidyr")) {
   }
 }
 
-message("Leser hovedmodell...")
-hovedmodell <- readRDS(file.path(utmappe, "modell_y5_hovedmodell.rds"))
-kommuner_2024 <- rownames(ranef(hovedmodell)$kommunenr_2024)
+message("Leser hovedmodell_slope...")
+hovedmodell_slope <- readRDS(file.path(utmappe, "modell_y5_hovedmodell_slope.rds"))
+kommuner_2024 <- rownames(ranef(hovedmodell_slope)$kommunenr_2024)
 
 ALTERNATIV <- "Personer"      # "Personer"=MMMM (hoved), "Personer1"=LLML, "Personer2"=HHMH
 AR_FRAMOVER <- 2026:2050
+SLUTTAAR_OVERGANG <- max(AR_FRAMOVER)
+SISTE_OBSERVERTE_AR <- 2025
+
+message("Leser historikk (for anker og glidende overgang)...")
+historisk <- readRDS(file.path(utmappe, "paneldata_2007_2025_2024struktur_med_demens.rds"))
+historisk$demensandel <- historisk$demens_estimert / historisk$folk_ialt
+demensandel_anker <- historisk |>
+  filter(år == SISTE_OBSERVERTE_AR) |>
+  transmute(kommunenr_2024, demensandel_anker = demensandel)
+siste_observert <- historisk |>
+  filter(år == SISTE_OBSERVERTE_AR) |>
+  transmute(kommunenr_2024, y5_observert = Y_5_ialt)
 
 message("Bygger kommunehistorikk...")
 kommunehistorikk <- hent_kommunehistorikk()
@@ -243,18 +256,14 @@ befolkning_fremtid <- hent_framskrevet_befolkning(
   kommuner_2024, AR_FRAMOVER, alternativ = ALTERNATIV, kommunehistorikk = kommunehistorikk)
 
 message("Beregner framskrevet demensandel...")
-framtidsdata <- beregn_demens_framskrevet(befolkning_fremtid)
+framtidsdata <- beregn_demens_framskrevet(befolkning_fremtid) |>
+  left_join(demensandel_anker, by = "kommunenr_2024")
 
 message("Predikerer Y_5 (rå modellframskrivning)...")
-framskrevet_y5_raa <- framskriv_y5(hovedmodell, framtidsdata)
+framskrevet_y5_raa <- framskriv_y5(hovedmodell_slope, framtidsdata)
 
-SISTE_OBSERVERTE_AR <- 2025
 message("Glatter overgangen fra observert ", SISTE_OBSERVERTE_AR, " til modell (",
         STARTAAR_OVERGANG, "-", SLUTTAAR_OVERGANG, ")...")
-historisk <- readRDS(file.path(utmappe, "paneldata_2007_2025_2024struktur_med_demens.rds"))
-siste_observert <- historisk |>
-  filter(år == SISTE_OBSERVERTE_AR) |>
-  transmute(kommunenr_2024, y5_observert = Y_5_ialt)
 framskrevet_y5 <- glatt_overgang(framskrevet_y5_raa, siste_observert)
 
 ## ---- Lagre -------------------------------------------------------------

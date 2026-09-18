@@ -6,17 +6,39 @@
 ##     (hent_paneldata_2007_2025.R + legg_til_demens.R)
 ##   - Framskrivning: data/ssb/framskrevet_<variabel>.rds
 ##     (modell_<variabel>.R + framskriv_<variabel>.R), kun hovedalternativet
-##     MMMM, 2026-2050, basert på hovedmodell (kun tilfeldig kommuneintercept
-##     - se framskriv_y1.R for hvorfor helningsmodellen ble forkastet, samme
-##     begrunnelse gjelder øvrige variabler).
+##     MMMM, 2026-2050, basert på hovedmodell_slope (tilfeldig intercept OG
+##     helning på demensandel per kommune), ANKRET ved kommunens siste
+##     observerte (2025) demensandel - se framskriv_y1.R for full
+##     begrunnelse. Dette er en rettet policy: det ble tidligere brukt en
+##     SEPARAT intercept-only-modell for punktestimatet, som ga et synlig
+##     sprang mot trend-varianten under selv når trend-effekten var 0 % -
+##     de to var rett og slett ulike modeller. Nå brukes ALLTID
+##     hovedmodell_slope, med T (trend-utfasing) implisitt = 0 for
+##     standardvisningen.
 ##
 ## Nye Y-variabler legges til i Y_VARIABLER-listen under - resten av appen
 ## (kommuneutvalg, plott, tabell, nedlasting) er felles og variabel-agnostisk.
 ##
-## Planlagt videre arbeid:
-##   - Flere Y-variabler (Y_3/Y_4/Y_5 separat, hvis ønskelig utover Y_2*).
-##   - Konfidens-/prediksjonsintervall på framskrivningen.
-##   - Valg av befolkningsscenario (i dag kun hovedalternativet MMMM).
+## Alle variabler har i tillegg en egen, reaktiv framskrivningsvariant
+## (framskriv_trend()) basert på den respektive hovedmodell_slope (tilfeldig
+## helning på demensandel per kommune, tolket som en kommunespesifikk
+## trend/politikk), med en brukerstyrt utfasing av denne trenden over T år -
+## se egen kommentarblokk ved framskriv_trend() under. Skrus på med en
+## avkryssingsboks i appen (av som standard). IKKE bootstrap-testet ennå
+## (usikkerhetsbånd vises derfor ikke når denne varianten er valgt).
+##
+## Glidende overgang (observert siste år -> modell) strekkes nå over HELE
+## framskrivningsperioden (2026-2050), ikke bare de første 10 årene - se
+## framskriv_y1.R for begrunnelse (unngår et kink i grafen ved gammelt
+## brytpunkt i 2036).
+##
+## Planlagt videre arbeid (se også "Om"-fanen i appen):
+##   - Bootstrap-usikkerhet for trend-varianten.
+##   - Flere Y-variabler.
+##   - Valg av befolkningsscenario: LLML/HHMH (SSB) og Telemarksforsking,
+##     i tillegg til hovedalternativet MMMM.
+##   - Estimere TILBUD (ikke bare etterspørsel) av sykepleiere, med
+##     metodikk fra SSB-rapporten RAPP 2026/18 (se lenke i "Om"-fanen).
 
 library(shiny)
 library(bslib)
@@ -24,6 +46,7 @@ library(httr2)
 library(dplyr)
 library(plotly)
 library(DT)
+library(lme4)
 
 utmappe <- file.path("data", "ssb")
 
@@ -38,6 +61,9 @@ utmappe <- file.path("data", "ssb")
 ## `usikkerhet_fil`/`nedre_kolonne`/`ovre_kolonne` peker til output fra det
 ## tilhørende usikkerhet_*.R-scriptet (95 % bootstrap-konfidensintervall for
 ## framskrivningen).
+## `modell_slope_fil` peker til den tilfeldig-helning-varianten av modellen
+## (se modell_<variabel>.R) - brukes av framskriv_trend() til den
+## kommunespesifikke trend-varianten (se lenger ned).
 Y_VARIABLER <- list(
   Y_1 = list(
     navn = "Etterspørsel etter hjemmetjenester (brukere)",
@@ -47,6 +73,7 @@ Y_VARIABLER <- list(
     usikkerhet_fil = "framskrevet_y1_usikkerhet.rds",
     nedre_kolonne = "y1_nedre",
     ovre_kolonne = "y1_ovre",
+    modell_slope_fil = "modell_y1_hovedmodell_slope.rds",
     flagg_2010 = TRUE
   ),
   Y_2_stjerne = list(
@@ -57,16 +84,18 @@ Y_VARIABLER <- list(
     usikkerhet_fil = "framskrevet_y2_stjerne_usikkerhet.rds",
     nedre_kolonne = "y2s_nedre",
     ovre_kolonne = "y2s_ovre",
+    modell_slope_fil = "modell_y2s_hovedmodell_slope.rds",
     flagg_2010 = FALSE
   ),
   Y_5 = list(
-    navn = "Etterspørsel etter sykepleiere (årsverk)",
+    navn = "Etterspørsel etter sykepleier (avtalte årsverk)",
     historisk_kolonne = "Y_5_ialt",
     framskrevet_fil = "framskrevet_y5.rds",
     framskrevet_kolonne = "y5_predikert",
     usikkerhet_fil = "framskrevet_y5_usikkerhet.rds",
     nedre_kolonne = "y5_nedre",
     ovre_kolonne = "y5_ovre",
+    modell_slope_fil = "modell_y5_hovedmodell_slope.rds",
     flagg_2010 = FALSE
   )
 )
@@ -104,6 +133,109 @@ usikkerhet_liste <- lapply(Y_VARIABLER, function(v) {
   readRDS(file.path(utmappe, v$usikkerhet_fil))
 })
 
+## ============================================================================
+## Kommunespesifikk trend (tilfeldig helning på demensandel) - alle variabler
+## ============================================================================
+## `hovedmodell_slope` (se modell_<variabel>.R) har - i tillegg til det
+## tilfeldige kommuneintercepet som brukes i hovedmodellen - en TILFELDIG
+## HELNING per kommune på demensandel. Denne tolkes her som en
+## kommunespesifikk TREND (f.eks. lokal politikk) i hvor sterkt
+## etterspørselen utvikler seg med demensandelen, utover det nasjonale
+## gjennomsnittet.
+##
+## Denne trenden er IKKE nødvendigvis noe man vil anta varer resten av
+## framskrivningsperioden (25 år) - den fases derfor lineært UT over T år,
+## valgt av brukeren i appen (T = 0-10): 100 % effekt i 2026, avtagende til
+## 0 % ved år (2026 + T). T = 0 gir ingen trendeffekt i det hele tatt.
+## Dette er en ANNEN, uavhengig utfasing enn glidende-overgang-mekanismen
+## under (som blander inn observert siste år) - begge virker samtidig.
+##
+## ANKRING VED SISTE OBSERVERTE (2025) NIVÅ, IKKE VED ABSOLUTT NULL:
+## intercept og helning er sterkt korrelerte i disse modellene (estimert
+## SOM ET PAR). Å bare nulle ut helningens bidrag ved absolutt
+## demensandel = 0, mens kommunens fulle tilfeldige intercept beholdes
+## uendret, gir et inkonsistent "halvt par" og eksploderende verdier
+## (testet og bekreftet). Løsningen er å ankre utfasingen ved kommunens
+## SISTE OBSERVERTE (2025) demensandel: `intercept_prime` bygger inn hele
+## kommunens nivå VED ANKERET - denne delen fases ALDRI ut. Det som fases
+## ut over T år er BARE den tilfeldige helningens bidrag til ENDRINGEN i
+## demensandel UTOVER ankeret (dvs. framtidig vekst), som i seg selv er en
+## liten størrelse - dette unngår eksplosjonen og gir en glatt overgang.
+##
+## NB: bootstrap-usikkerhet er IKKE beregnet for denne varianten ennå -
+## ingen usikkerhetsbånd vises når trend-effekt er valgt.
+modell_slope_liste <- lapply(Y_VARIABLER, function(v) {
+  readRDS(file.path(utmappe, v$modell_slope_fil))
+})
+
+demensandel_anker <- historisk |>
+  filter(år == 2025) |>
+  transmute(kommunenr_2024, demensandel_anker = demensandel)
+
+siste_observert_liste <- lapply(Y_VARIABLER, function(v) {
+  historisk |>
+    filter(år == 2025) |>
+    transmute(kommunenr_2024, observert = .data[[v$historisk_kolonne]])
+})
+
+## Befolkning/demensandel for framskrivingsårene er uavhengig av hvilken
+## modellvariant som brukes - gjenbruk derfor det som allerede er beregnet
+## for hovedmodellen (framskrevet_liste), i stedet for å hente på nytt.
+framtidsdata_liste <- list()
+for (id in names(Y_VARIABLER)) {
+  framtidsdata_liste[[id]] <- framskrevet_liste[[id]] |>
+    select(kommunenr_2024, år, folk_ialt, demensandel) |>
+    distinct() |>
+    left_join(demensandel_anker, by = "kommunenr_2024")
+}
+
+framskriv_trend <- function(variabel_id, T) {
+  v <- Y_VARIABLER[[variabel_id]]
+  modell_slope <- modell_slope_liste[[variabel_id]]
+  verdi_kolonne <- v$framskrevet_kolonne
+  d0 <- framtidsdata_liste[[variabel_id]]
+  siste_observert <- siste_observert_liste[[variabel_id]]
+
+  faste <- fixef(modell_slope)
+  intercept <- faste[["(Intercept)"]]
+  demens_koef <- faste[["demensandel"]]
+  aar_koef <- faste[grepl("^år_f", names(faste))]
+  aar_effekt_framskrevet <- mean(aar_koef)
+
+  re <- ranef(modell_slope)$kommunenr_2024
+  d <- d0[as.character(d0$kommunenr_2024) %in% rownames(re), ]
+
+  u_intercept <- re[as.character(d$kommunenr_2024), "(Intercept)"]
+  u_slope <- re[as.character(d$kommunenr_2024), "demensandel"]
+
+  startaar <- min(d$år)
+  sluttaar <- max(d$år)
+
+  # Lineær utfasing av trenden: 100 % i startåret -> 0 % ved (startår + T).
+  aar_siden_start <- d$år - startaar
+  vekt_trend <- if (T <= 0) rep(0, nrow(d)) else pmax(0, (T - aar_siden_start) / T)
+
+  intercept_prime <- intercept + u_intercept + (demens_koef + u_slope) * d$demensandel_anker
+  delta_demensandel <- d$demensandel - d$demensandel_anker
+
+  lin_pred <- intercept_prime + aar_effekt_framskrevet +
+    (demens_koef + vekt_trend * u_slope) * delta_demensandel +
+    log(d$folk_ialt)
+
+  d[[verdi_kolonne]] <- as.numeric(exp(lin_pred))
+
+  # Glidende overgang (observert siste år -> modell), strukket over HELE
+  # framskrivningsperioden - samme prinsipp/begrunnelse som framskriv_y1.R.
+  m <- merge(d, siste_observert, by = "kommunenr_2024", all.x = TRUE)
+  vekt_obs <- pmax(0, 0.9 * (sluttaar - m$år) / (sluttaar - startaar))
+  modell_kolonne <- paste0(verdi_kolonne, "_modell")
+  m[[modell_kolonne]] <- m[[verdi_kolonne]]
+  m[[verdi_kolonne]] <- ifelse(is.na(m$observert), m[[modell_kolonne]],
+                                vekt_obs * m$observert + (1 - vekt_obs) * m[[modell_kolonne]])
+  m$observert <- NULL
+  m
+}
+
 kommunenavn <- tryCatch(hent_kommunenavn(), error = function(e) NULL)
 
 kommuner_tilgjengelig <- sort(unique(historisk$kommunenr_2024))
@@ -121,10 +253,14 @@ KOMMUNE_STANDARD <- if ("3101" %in% kommuner_tilgjengelig) "3101" else kommuner_
 ## Variabel-agnostisk: leser kolonnenavn fra Y_VARIABLER-oppføringen for
 ## valgt variabel, og returnerer alltid en `verdi`-kolonne uansett hvilken
 ## variabel som er valgt.
-lag_tidsserie <- function(kommune, variabel_id) {
+## `framskrevet_override`: brukes for Y_1 sin trend-variant (se over) - en
+## allerede beregnet data.frame for ALLE kommuner, med samme kolonner som
+## framskrevet_liste sine oppføringer. Når denne er satt, finnes det ikke
+## noe usikkerhetsbånd (bootstrap er ikke kjørt for denne varianten).
+lag_tidsserie <- function(kommune, variabel_id, framskrevet_override = NULL) {
   v <- Y_VARIABLER[[variabel_id]]
-  framskrevet <- framskrevet_liste[[variabel_id]]
-  usikkerhet <- usikkerhet_liste[[variabel_id]]
+  framskrevet <- if (!is.null(framskrevet_override)) framskrevet_override else framskrevet_liste[[variabel_id]]
+  usikkerhet <- if (!is.null(framskrevet_override)) NULL else usikkerhet_liste[[variabel_id]]
 
   obs <- historisk |>
     filter(kommunenr_2024 == kommune) |>
@@ -133,13 +269,17 @@ lag_tidsserie <- function(kommune, variabel_id) {
   proj <- framskrevet |>
     filter(kommunenr_2024 == kommune) |>
     transmute(år, kilde = "Framskrevet (MMMM)", verdi = .data[[v$framskrevet_kolonne]],
-              folk_ialt, demensandel) |>
-    left_join(
+              folk_ialt, demensandel)
+  proj <- if (!is.null(usikkerhet)) {
+    proj |> left_join(
       usikkerhet |>
         filter(kommunenr_2024 == kommune) |>
         transmute(år, nedre = .data[[v$nedre_kolonne]], ovre = .data[[v$ovre_kolonne]]),
       by = "år"
     )
+  } else {
+    proj |> mutate(nedre = NA_real_, ovre = NA_real_)
+  }
   bind_rows(obs, proj) |> arrange(år)
 }
 
@@ -155,6 +295,17 @@ ui <- page_sidebar(
     selectInput("variabel", "Variabel",
                 choices = setNames(names(Y_VARIABLER), vapply(Y_VARIABLER, `[[`, "", "navn"))),
     selectizeInput("kommune", "Kommune", choices = kommune_valg, selected = KOMMUNE_STANDARD),
+    checkboxInput("bruk_trend", "Bruk kommunens egen trend", value = FALSE),
+    conditionalPanel(
+      condition = "input.bruk_trend == true",
+      sliderInput("trend_T", "Trenden fases ut over (år)",
+                  min = 0, max = 10, value = 5, step = 1),
+      tags$small(class = "text-muted",
+                  "Styrer hvor lenge kommunens egen historiske utvikling ",
+                  "påvirker framskrivningen, før den går over til det ",
+                  "nasjonale gjennomsnittet. 0 år = ingen effekt. Vises uten ",
+                  "usikkerhetsintervall.")
+    ),
     tags$hr(),
     tags$small(
       class = "text-muted",
@@ -178,18 +329,38 @@ ui <- page_sidebar(
       br(),
       div(
         h4("Om denne visningen"),
-        p("Viser observerte tall 2007-2025 og en framskrivning 2026-2050 for valgt variabel og kommune, basert på SSBs offisielle statistikk og befolkningsframskrivninger. Det skraverte feltet rundt framskrivningen viser et 95 % usikkerhetsintervall."),
+        p("Viser observerte tall 2007-2025 og en framskrivning 2026-2050 for valgt variabel og kommune, basert på SSBs offisielle statistikk og befolkningsframskrivninger. Det skraverte feltet rundt framskrivningen viser et 95 % usikkerhetsintervall, der det er beregnet."),
+        p("Du kan også slå på \"Bruk kommunens egen trend\" for å justere hvor lenge kommunens egen historiske utvikling skal påvirke framskrivningen, før den går over til det nasjonale gjennomsnittet."),
         h5("Kjente begrensninger"),
         tags$ul(
           tags$li("For enkelte variabler er ett eller flere år utelatt fra beregningsgrunnlaget pga. datakvalitet - merkes i plottet der det er relevant."),
           tags$li("For enkelte variabler finnes historiske tall bare for en del av perioden 2007-2025 - vises som et hull i den historiske linjen."),
           tags$li("Kun ett befolkningsscenario er beregnet så langt."),
-          tags$li("Usikkerhetsintervallet fanger opp estimeringsusikkerhet i modellen, ikke usikkerhet i selve befolkningsframskrivningen eller i valg av modelltype.")
+          tags$li("Usikkerhetsintervallet fanger opp estimeringsusikkerhet i modellen, ikke usikkerhet i selve befolkningsframskrivningen eller i valg av modelltype."),
+          tags$li("Usikkerhetsintervall er ikke beregnet når kommunens egen trend er slått på.")
         ),
         h5("Planlagt videre arbeid"),
-        tags$ul(
+        tags$ol(
           tags$li("Eventuelt flere variabler."),
-          tags$li("Valg av flere befolkningsscenarioer.")
+          tags$li("Valg av flere befolkningsscenarioer."),
+          tags$li("Nøyere gjennomgang av datagrunnlag for å luke ut feilregistreringer"), 
+          tags$li("Estimere tilbud (ikke bare etterspørsel) av sykepleiere, med metodikk fra ",
+            tags$a(
+              href = "https://www.ssb.no/helse/helsetjenester/artikler/behov-for-og-tilgang-pa-arbeidskraft-i-offentlig-helse-og-omsorg-fremover/_/attachment/inline/e35491e6-e7b1-43f0-82f9-726b8b21574e:2475fafc0fdb77314f7751654ffea53725e30f2e/RAPP2026-18.pdf",
+              target = "_blank", rel = "noopener noreferrer",
+              "SSBs rapport RAPP 2026/18"
+            ),
+            ". Inkludere LLML- og HHMH-befolkningsframskrivninger fra SSB, samt befolkningsframskrivninger fra Telemarksforsking, som alternativ til hovedalternativet MMMM."
+          )
+        ),
+        h5("Datakilder"),
+        p("All historikk og framskrivning bygger på offentlig tilgjengelig statistikk fra SSBs statistikkbank (data.ssb.no):"),
+        tags$ul(
+          tags$li(tags$b("04686, 12292"), " - kommunale omsorgstjenester (mottakere av hjemmetjenester, heldøgnsbolig, tildelte timer/uke)"),
+          tags$li(tags$b("11645"), " - mottakere av institusjonstjenester (langtidsopphold)"),
+          tags$li(tags$b("11924, 14534"), " - sykepleiere, avtalte årsverk"),
+          tags$li(tags$b("07459"), " - befolkning etter kommune, alder og kjønn"),
+          tags$li(tags$b("12882"), " - SSBs befolkningsframskrivninger")
         )
       )
     )
@@ -201,9 +372,18 @@ ui <- page_sidebar(
 ## ============================================================================
 server <- function(input, output, session) {
 
+  # Rå trend-framskrivning for ALLE kommuner (billig å regne om - ingen
+  # modell-refit, bare lineær algebra på en allerede estimert modell) for
+  # valgt variabel. Filtreres til valgt kommune inne i lag_tidsserie().
+  framskrevet_trend_reaktiv <- reactive({
+    req(input$variabel, input$trend_T)
+    framskriv_trend(input$variabel, input$trend_T)
+  })
+
   tidsserie <- reactive({
     req(input$kommune, input$variabel)
-    lag_tidsserie(input$kommune, input$variabel)
+    override <- if (isTRUE(input$bruk_trend)) framskrevet_trend_reaktiv() else NULL
+    lag_tidsserie(input$kommune, input$variabel, framskrevet_override = override)
   })
 
   output$plot_verdi <- renderPlotly({

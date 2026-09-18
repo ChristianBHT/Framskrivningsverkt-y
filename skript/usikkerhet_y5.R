@@ -38,40 +38,33 @@ modelldata <- paneldata |>
          folk_ialt > 0, Y_5_ialt > 0) |>
   mutate(kommunenr_2024 = factor(kommunenr_2024), år_f = factor(år))
 
-FORMEL <- log(Y_5_ialt) ~ år_f + demensandel + offset(log(folk_ialt)) + (1 | kommunenr_2024)
+## Bruker BEVISST hovedmodell_slope (samme FORMEL_SLOPE som modell_y5.R),
+## IKKE intercept-only-varianten - se framskriv_y1.R for begrunnelsen.
+FORMEL_SLOPE <- log(Y_5_ialt) ~ år_f + demensandel + offset(log(folk_ialt)) +
+  (1 + demensandel | kommunenr_2024)
 
 ## ============================================================================
 ## 2. Gjenbruk befolkningsframskrivning + siste observerte år (ingen SSB-kall)
 ## ============================================================================
 message("Leser allerede beregnet befolkningsframskrivning fra framskrevet_y5.rds...")
 framskrevet_eksisterende <- readRDS(file.path(utmappe, "framskrevet_y5.rds"))
-framtidsdata <- framskrevet_eksisterende |>
-  select(kommunenr_2024, år, folk_ialt, demens_estimert, demensandel) |>
-  distinct()
 
 SISTE_OBSERVERTE_AR <- 2025
+demensandel_anker <- paneldata |>
+  filter(år == SISTE_OBSERVERTE_AR) |>
+  transmute(kommunenr_2024, demensandel_anker = demensandel)
 siste_observert <- paneldata |>
   filter(år == SISTE_OBSERVERTE_AR) |>
   transmute(kommunenr_2024, y5_observert = Y_5_ialt)
 
-## ============================================================================
-## 3. Hjelpefunksjoner (samme logikk som framskriv_y5.R)
-## ============================================================================
-re_bidrag <- function(modell, gruppevar, nydata) {
-  re_df <- ranef(modell)[[gruppevar]]
-  grupper <- as.character(nydata[[gruppevar]])
-  bidrag <- numeric(nrow(nydata))
-  for (kolonne in names(re_df)) {
-    verdier <- re_df[grupper, kolonne]
-    if (identical(kolonne, "(Intercept)")) {
-      bidrag <- bidrag + verdier
-    } else {
-      bidrag <- bidrag + verdier * nydata[[kolonne]]
-    }
-  }
-  bidrag
-}
+framtidsdata <- framskrevet_eksisterende |>
+  select(kommunenr_2024, år, folk_ialt, demens_estimert, demensandel) |>
+  distinct() |>
+  left_join(demensandel_anker, by = "kommunenr_2024")
 
+## ============================================================================
+## 3. Hjelpefunksjon (samme anker-metode som framskriv_y5.R)
+## ============================================================================
 framskriv_y5 <- function(modell, framtidsdata) {
   faste <- fixef(modell)
   intercept <- faste[["(Intercept)"]]
@@ -79,15 +72,21 @@ framskriv_y5 <- function(modell, framtidsdata) {
   aar_koef <- faste[grepl("^år_f", names(faste))]
   aar_effekt_framskrevet <- mean(aar_koef)
 
-  kjente_kommuner <- rownames(ranef(modell)$kommunenr_2024)
-  kjent <- as.character(framtidsdata$kommunenr_2024) %in% kjente_kommuner
+  re <- ranef(modell)$kommunenr_2024
+  kjent <- as.character(framtidsdata$kommunenr_2024) %in% rownames(re)
   if (!all(kjent)) framtidsdata <- framtidsdata[kjent, ]
+
+  u_intercept <- re[as.character(framtidsdata$kommunenr_2024), "(Intercept)"]
+  u_slope <- re[as.character(framtidsdata$kommunenr_2024), "demensandel"]
 
   ## Log-lineær-med-offset-form (se modell_y5.R) - eksponensier tilbake til
   ## opprinnelig skala (årsverk).
-  lin_pred <- intercept + aar_effekt_framskrevet +
-    demens_koef * framtidsdata$demensandel +
-    re_bidrag(modell, "kommunenr_2024", framtidsdata) +
+  intercept_prime <- intercept + u_intercept +
+    (demens_koef + u_slope) * framtidsdata$demensandel_anker
+  delta_demensandel <- framtidsdata$demensandel - framtidsdata$demensandel_anker
+
+  lin_pred <- intercept_prime + aar_effekt_framskrevet +
+    demens_koef * delta_demensandel +
     log(framtidsdata$folk_ialt)
 
   framtidsdata$y5_predikert <- as.numeric(exp(lin_pred))
@@ -95,7 +94,7 @@ framskriv_y5 <- function(modell, framtidsdata) {
 }
 
 STARTAAR_OVERGANG <- 2026
-SLUTTAAR_OVERGANG <- 2036
+SLUTTAAR_OVERGANG <- max(framtidsdata$år)
 START_ANDEL_OBSERVERT <- 0.9
 
 glatt_overgang <- function(framskrevet_raa, siste_observert) {
@@ -130,7 +129,8 @@ for (r in seq_len(ANTALL_BOOTSTRAP)) {
 
   modell_r <- tryCatch(
     suppressWarnings(suppressMessages(
-      lmer(FORMEL, data = modelldata, weights = radvekt)
+      lmer(FORMEL_SLOPE, data = modelldata, weights = radvekt,
+           control = lmerControl(optimizer = "bobyqa"))
     )),
     error = function(e) {
       message("  Iterasjon ", r, ": konvergerte ikke (", conditionMessage(e), ") - hoppes over.")

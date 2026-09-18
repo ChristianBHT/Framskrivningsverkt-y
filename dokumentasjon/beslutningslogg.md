@@ -111,6 +111,10 @@ modellenes formler og estimeringsdetaljer, se
   historisk observerte området vurderes som viktigere enn litt bedre
   in-sample/CV-passform. Helningsvariantene beregnes og lagres likevel,
   for diagnostisk fullstendighet.
+  **OPPDATERT (se punkt 9)**: denne policyen er senere reversert for
+  FRAMSKRIVNING (ikke for kryssvalideringen over, som fortsatt er gyldig
+  akkurat som beskrevet) - en ankringsmetode gjør det trygt å bruke
+  helningsmodellen likevel, og løser samtidig en reell inkonsistens-bug.
 - **Kryssvalideringsmetode**: leave-one-year-out (LOYO) for alle modeller
   - modellen trenes på alle år UTENOM ett, og evalueres på det utelatte
   året. Årsdummy-modeller kan per definisjon ikke ha en egen koeffisient
@@ -184,3 +188,69 @@ modellenes formler og estimeringsdetaljer, se
   å vurdere modellenes prediktive treffsikkerhet, i tillegg til
   AIC/BIC-sammenligning og eksplisitt sjekk av "feil fortegn" på
   `demensandel`-helningen per kommune.
+
+## 8. Kvantifisering av usikkerhet (Bayesiansk bootstrap)
+
+- **Metode**: kommune-vis Bayesiansk bootstrap - én Dirichlet(1,...,1)-vekt
+  per kommune per iterasjon (samme vekt for alle år i kommunen, siden
+  kommunen er den egentlige "enheten" i panelstrukturen), brukt som
+  presisjonsvekt i en refit av hovedmodellen, med samme framskrivnings- og
+  glidende-overgang-logikk som punktestimatet. Kjørt for Y_1, Y_2* og Y_5
+  (60 iterasjoner hver, se `usikkerhet_*.R`).
+- **Bevisst valg: ikke lagre enkeltiterasjonene** - bootstrap-utvalgene
+  holdes kun i en midlertidig matrise i minnet, og BARE 2,5/97,5-
+  persentilene (95 %-intervallet) skrives til disk. Unngår å bygge opp
+  store mellomresultatfiler for noe som uansett bare skal oppsummeres.
+- **Vektskalering**: en rå Dirichlet(1,...,1)-trekning summerer til 1 (hver
+  vekt ~1/K). Brukt direkte som `weights` i `glmer`/`lmer` ville dette
+  kunstig blåst opp den estimerte variansen (weights tolkes som
+  presisjonsvekter, ikke sannsynlighetsvekter). Skalert opp med K slik at
+  vektene i gjennomsnitt er 1 - endrer ikke bootstrap-variasjonens
+  relative form, bare skalaen.
+- **Gjenbruk av befolkningsframskrivning**: `folk_ialt`/`demensandel` for
+  2026-2050 er uavhengig av bootstrap-vektene (kommer fra SSBs
+  befolkningsframskrivning, ikke fra modellestimeringen) - hentes fra de
+  allerede lagrede `framskrevet_*.rds`-filene i stedet for på nytt fra SSB
+  for hver iterasjon.
+
+## 9. Retur til slope-modell for framskrivning (rettet en reell bug)
+
+- **Bakgrunn**: appen fikk en "kommunespesifikk trend"-funksjon (tilfeldig
+  helning på demensandel, tolket som lokal politikk), med en bryter for å
+  fase den ut over T år. Brukeren oppdaget at når bryteren var AV, ga
+  framskrivningen (basert på den opprinnelige intercept-only
+  `hovedmodell`) en ANNEN verdi enn når bryteren var PÅ med T = 0 år
+  (som skulle bety "ingen trendeffekt", og derfor burde gitt SAMME
+  resultat). Eksempel: Halden, Y_1, 2050 - 3002 (bryter av) vs. 2043
+  (bryter på, T = 0).
+- **Rotårsak**: de to tallene kom fra to FORSKJELLIGE modeller
+  (`hovedmodell` vs. `hovedmodell_slope`), estimert separat med ULIKE
+  faste effekter (intercept, demensandel-koeffisient) - ikke samme modell
+  med og uten et tillegg. Å bytte modell basert på en bryter som skulle
+  bety "denne ekstra effekten er 0" er derfor feil - det gir en
+  diskontinuitet uansett hvordan T settes til 0.
+- **Beslutning (brukerens instruks)**: bruk KUN `hovedmodell_slope` for
+  all framskrivning - fjern `hovedmodell` (intercept-only) fra
+  framskrivningsbruk helt. Dette reverserer den tidligere policyen i
+  punkt 3 ("bruk alltid intercept-only for framskrivning pga.
+  fortegnsproblemet"), men på en måte som samtidig LØSER
+  fortegnsproblemet:
+  - Løsningen er å ANKRE framskrivningen ved kommunens siste observerte
+    (2025) demensandel (se teknisk_dokumentasjon.md pkt. 7 for eksakt
+    formel). Kommunens fulle nivå VED ANKERET (som bruker BÅDE fast og
+    tilfeldig helning) er en KONSTANT som ikke kan eksplodere. All
+    FRAMTIDIG vekst bruker BARE det faste (nasjonale) helningsanslaget -
+    ALDRI kommunens egen tilfeldige helning. Siden det nettopp var
+    kommunens egen (potensielt feil-fortegnede) helning brukt på FRAMTIDIG
+    vekst som var problemet, er faren eliminert når den bare brukes på et
+    fast historisk ankerpunkt.
+  - Dette gjør "trend-bryteren av" og "trend-bryter på med T = 0"
+    MATEMATISK IDENTISKE per konstruksjon (samme modell, samme formel,
+    T = 0 gir bare vekt 0 på det ekstra trend-leddet) - bekreftet numerisk
+    for alle tre variabler (Y_1, Y_2*, Y_5) etter rettingen.
+- **Konsekvens**: `framskriv_y1.R`/`framskriv_y2_stjerne.R`/
+  `framskriv_y5.R` og `usikkerhet_y1.R`/`usikkerhet_y2_stjerne.R`/
+  `usikkerhet_y5.R` bruker nå alle `hovedmodell_slope` (aldri
+  intercept-only-modellen) for faktisk framskrivning og
+  bootstrap-usikkerhet. Punktestimater og bootstrap-CI er begge
+  regenerert med den nye metoden.

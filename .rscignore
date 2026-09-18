@@ -1,0 +1,18 @@
+# .rscignore støtter IKKE wildcards eller negasjon (kun ett fil-/mappenavn
+# per linje, relativt til prosjektroten) - se `?rsconnect::listDeploymentFiles`.
+# Den fin-kornede utvalgingen av HVILKE data/ssb/-filer som faktisk skal
+# lastes opp (appen bruker bare 10 av 65 filer der) gjøres derfor i stedet
+# via `appFiles`-argumentet til `rsconnect::deployApp()`, ikke her.
+#
+# Frittstående arbeidsflyt-script - kjøres aldri av selve Shiny-appen
+# (se app.R sin toppkommentar), ingen grunn til å laste dem opp.
+skript
+
+# Prosjektdokumentasjon - ikke en del av appen (se beslutningslogg.md
+# punkt 6: metodikk skal bevisst IKKE være tilgjengelig fra appen selv).
+dokumentasjon
+
+# Vanlige lokale/IDE-filer.
+.Rproj.user
+.Rhistory
+Framskrivningsverktøy.Rproj
