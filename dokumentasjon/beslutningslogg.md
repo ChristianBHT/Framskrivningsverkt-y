@@ -198,7 +198,7 @@ modellenes formler og estimeringsdetaljer, se
   appen (kommuneutvalg, plott, tabell, nedlasting) er felles kode som
   leser fra denne listen. Gjør det enkelt å legge til en ny Y-variabel
   uten å endre UI/plott/tabell-logikk (gjort for `Y_2*` og `Y_5`).
-- **Ingen metodikk/modelldetaljer skal vises i appen selv** - "Om"-fanen
+- **[TIDLIGERE POLICY - opphevet, se punkt 14]** Ingen metodikk/modelldetaljer skal vises i appen selv - "Om"-fanen
   er bevisst forenklet til å IKKE avsløre hvilken modelltype, hvilke
   formler eller hvilke script som brukes, slik at eksterne brukere av
   appen ikke kan se nøyaktig hvordan framskrivningene beregnes. Fullstendig
@@ -336,3 +336,125 @@ modellenes formler og estimeringsdetaljer, se
 - **`skript/` og `dokumentasjon/` lastes ikke opp** - appen leser dem
   aldri (se punkt 6), og de har heller ingen verdi for en ekstern bruker
   av den ferdige appen.
+- **Publisert URL**: https://christianbht.shinyapps.io/Fram/ (konto
+  `christianbht`, appnavn `Fram`). Redeployet én gang etter at appens
+  tittel ble endret til "Framskrivningsmodellen Fram - Resultater".
+- **Status per 2026-09-21**: den publiserte versjonen inneholder IKKE den
+  alternative Y_5-linjen (punkt 11) - de to nye filene er lagt til i
+  opplastingslisten, men appen er ikke redeployet siden.
+- `deployApp()` oppretter en `rsconnect/`-mappe i prosjektroten med
+  publiseringsmetadata; den er ikke en del av appen og bør holdes utenfor
+  versjonskontroll.
+
+## 11. Alternativ estimering av Y_5 (Poisson) - KJENT PROBLEM
+
+- **Bestilling**: en alternativ Y_5-estimering med samme modellfamilie som
+  Y_1 og Y_2\* (Poisson med befolkningsoffset og tilfeldig kommuneeffekt),
+  uten konfidensintervall, vist i SAMME plott som hovedestimatet.
+- **Løsning**: `modell_y5_poisson.R` (modell + leave-one-year-out-CV),
+  `framskriv_y5_poisson.R` (samme ankermetode og glidende overgang som de
+  øvrige framskrivningene, gjenbruker cachet befolkning/demensandel fra
+  `framskrevet_y5.rds`). I appen vises den som en grønn, stiplet linje
+  ("Alternativ modell (MMMM)") uten usikkerhetsbånd, og følger
+  trend-bryteren/slideren. Etiketten er bevisst nøytral (avslører ikke
+  modelltype, jf. punkt 6).
+- **Valg som viste seg å være feil**: årsverk er ikke heltall. Modellen ble
+  først estimert på de uavrundede årsverkene (Poisson pseudo-likelihood),
+  og tolket som gyldig ut fra en god kryssvalidering (RMSE 14,1 / MAE 5,6 /
+  korrelasjon 0,9974). **Ved kontroll ved oppdatering av dokumentasjonen ble
+  det oppdaget at de tilfeldige effektenes varianser ikke estimeres:**
+  `theta` står på lme4s startverdier (1, 0, 1), det gis advarselen "Gradient
+  contains NAs", og det samme gjelder en ren intercept-modell på de samme
+  dataene. Kryssvalideringen så altså fornuftig ut selv om modellen ikke
+  var riktig estimert. Modellen som ligger i appen er derfor **ikke
+  gyldig** som alternativ estimering - nivåene (bl.a. en
+  `demensandel`-koeffisient på 3,7 mot ~14-34 i de andre modellene) er ikke
+  til å stole på, og de rapporterte 2050-verdiene for alternativlinjen
+  (f.eks. Halden 209 mot 275 for hovedestimatet) bør ikke tolkes.
+- **Test av mulig rettelse (ikke innført)**: avrunding til heltall gir en
+  modell der variansene faktisk estimeres (SD intercept 0,58, SD helning
+  24,9, korrelasjon -0,91, `demensandel` 21,7, 32/357 kommuner med negativ
+  effektiv helning), men med en konvergensadvarsel (bobyqa nådde maks antall
+  funksjonskall, maks |gradient| 0,010 mot toleranse 0,002) - trenger
+  høyere `maxfun` og ny kontroll. Alternativ til avrunding: en modell
+  for kontinuerlige positive data (f.eks. Gamma med log-lenke).
+- **Åpent**: rette `modell_y5_poisson.R`, kjøre `framskriv_y5_poisson.R`
+  på nytt, og først deretter redeploye.
+
+## 12. Andre SSB-tabeller (11643 m.fl.)
+
+- Vurderer tabell **11643** (timer til omsorgstjenester per år) med
+  TenesteType 15 (helsetjenester i hjemmet) som mulig nytt utfall.
+  `hent_timer_11643.R` laster ned 2009-2025, kobler historiske
+  kommunenumre til 2024-strukturen (timer er additive, summeres) og
+  plotter de 10 største kommunene etter folketall 2025.
+- **Funn**: SSB fyller kommunekoder som ikke eksisterer et gitt år med **0**
+  (ikke manglende verdi), så summering over forgjengerkoder er trygg, men en
+  reell rapporteringsmangel ville også blitt 0. Noen serier har store hopp
+  som ikke er forklart (Bergen ~1,29 mill. timer 2020 → ~0,77 mill. 2024;
+  Trondheim ~0,19 mill. 2010 → ~0,29 mill. 2012; Stavanger 2009 ser lav ut).
+- De øvrige tabellene (09933, 06975, 12657, 11644), alternative
+  glattingsmetoder og sjekk av befolkningskoeffisienten er beskrevet i
+  [videre_arbeid.md](videre_arbeid.md). Tabelloversikten der bygger på
+  metadata hentet fra SSBs API.
+
+## 13. Modellsjekk: er koeffisienten på log(befolkning) lik 1?
+
+- **Bakgrunn**: alle modellene tvinger koeffisienten på log(befolkning) til
+  1 via `offset(log(folk_ialt))`, dvs. bruk antas proporsjonal med
+  folketallet. Dette er en antakelse som ikke er testet.
+- **Beslutning: ingen "Modellsjekker"-fane i appen** (brukerens valg).
+  Modellsjekker gjøres i frittstående script i `skript/`, i tråd med
+  prosjektets daværende policy om at metodikk ikke vises i appen (punkt 6,
+  senere opphevet, se punkt 14; valget om script fremfor fane står ved lag). Dette
+  erstatter forslaget om en egen fane i en tidligere versjon av
+  videre_arbeid.md.
+- **Metode** (`modellsjekk_kvantil.R`): kvantilregresjon
+  (`quantreg::rq`) på per-innbygger-formen
+  `log(y/befolkning) ~ log(befolkning) + demensandel + år`, for
+  τ = 0,1 / 0,25 / 0,5 / 0,75 / 0,9. Koeffisienten på `log(befolkning)` er
+  β_pop − 1, så 0 betyr proporsjonalitet. Usikkerhet fra Bayesiansk
+  bootstrap over kommuner (B = 100, samme Dirichlet-vekting som
+  `usikkerhet_*.R`, vekter sendt til `rq(weights = )`).
+- **Første resultat (Y_1)**: β_pop ≈ 1,00 ved τ = 0,1 (intervall
+  [0,985, 1,021], forenlig med 1), men under 1 for høyere kvantiler:
+  0,974 (τ = 0,25), 0,949 (0,5), 0,916 (0,75) og 0,894 (0,9), med 95 %
+  intervaller som utelukker 1. Proporsjonalitet forkastes altså fra medianen
+  og oppover: bruk per innbygger avtar med kommunestørrelse, mest blant
+  kommuner med høy bruk.
+- **Forbehold**: ingen tilfeldige effekter eller kommune-faste effekter i
+  `rq` - koeffisienten hentes hovedsakelig fra forskjeller MELLOM kommuner;
+  2 observasjoner med y = 0 utelates; kun Y_1 er kjørt (ikke Y_2\*/Y_5).
+- **Ikke innført ennå**: modellene bruker fortsatt offset. En fri
+  koeffisient krever at ankerformelen endres (se videre_arbeid.md pkt. 3).
+
+## 14. Dokumentasjon som faner i appen; ingen innlogging (2026-09-21)
+
+- **Beslutning (brukerens)**: appen forblir OFFENTLIG, uten innlogging. Et
+  passordbeskyttet område ble vurdert (Shiny har ingen innebygd
+  autentisering; alternativer er `shinymanager`/`shinyauthr`, en egen
+  passordport med serverside-rendering, eller innlogging på plattformnivå på
+  betalte shinyapps.io-planer) men ikke innført. Det finnes derfor ingen
+  innloggingskode i appen.
+- **Dokumentasjon åpent i appen**: teknisk dokumentasjon, beslutningslogg og
+  videre arbeid vises som egne faner ("Teknisk dokumentasjon",
+  "Beslutningslogg", "Videre arbeid"). Dette **opphever** den tidligere
+  policyen om at metodikk ikke skal vises i appen (punkt 6). Fanene leser
+  `dokumentasjon/*.md` ved oppstart og viser dem som HTML
+  (`commonmark`). Lenker til lokale `.md`-filer vises som ren tekst, siden
+  de ikke finnes som sider i appen; eksterne lenker åpnes i ny fane.
+- **Konsekvens for publisering**: `dokumentasjon/*.md` må nå med i
+  opplastingen (`skript/deploy_shinyapps.R`), og `dokumentasjon` er fjernet
+  fra `.rscignore`. Dokumentene beskriver også kjente feil (bl.a. den
+  ugyldige alternative Y_5-modellen, punkt 11) - de blir dermed synlige
+  for alle som åpner appen.
+- **Kontekst**: serveren skal tas ned om noen dager, så dette er en
+  midlertidig visning for gjennomgang, ikke en permanent publisering.
+- **Krav til den ENDELIGE appen (brukerens presisering)**: metodikk skal
+  bare forklares overfladisk. De tre dokumentasjonsfanene gjelder derfor
+  kun beta-versjonen til gjennomgang. Dette er gjort til én bryter i
+  `app.R`: `VIS_FULL_DOKUMENTASJON <- TRUE` (beta) / `FALSE` (endelig). Ved
+  `FALSE` vises ingen dokumentasjonsfaner, og "Om"-fanen har i stedet et kort,
+  generelt avsnitt ("Kort om metoden", alltid synlig) uten formler,
+  modelltyper eller filnavn. Ved overgang til endelig versjon: sett bryteren
+  til `FALSE` og fjern `dokumentasjon/*.md` fra `skript/deploy_shinyapps.R`.

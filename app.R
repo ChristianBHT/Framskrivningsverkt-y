@@ -47,8 +47,40 @@ library(dplyr)
 library(plotly)
 library(DT)
 library(lme4)
+library(commonmark)
 
 utmappe <- file.path("data", "ssb")
+
+## BRYTER: TRUE = fanene Teknisk dokumentasjon / Beslutningslogg / Videre
+## arbeid vises (beta-versjonen til gjennomgang). Sett til FALSE i den
+## ENDELIGE appen, der metodikk bare skal forklares overfladisk (kort
+## beskrivelse i "Om"-fanen). Husk da også å fjerne dokumentasjon/*.md fra
+## skript/deploy_shinyapps.R hvis de ikke skal lastes opp.
+VIS_FULL_DOKUMENTASJON <- TRUE
+
+## ---- Dokumentasjon vist som faner (åpen, ingen innlogging) -----------------
+## Teknisk dokumentasjon, beslutningslogg og videre arbeid leses fra
+## dokumentasjon/*.md ved oppstart og vises som HTML. Lenker til lokale
+## .md-filer (som ikke finnes som sider i appen) fjernes til ren tekst;
+## eksterne lenker åpnes i ny fane.
+les_dokument <- function(filnavn) {
+  sti <- file.path("dokumentasjon", filnavn)
+  if (!file.exists(sti)) return(tags$p("Dokumentet er ikke tilgjengelig."))
+  tekst <- readLines(sti, warn = FALSE, encoding = "UTF-8")
+  Encoding(tekst) <- "UTF-8"
+  html <- commonmark::markdown_html(paste(tekst, collapse = "\n"), extensions = TRUE)
+  html <- gsub('<a href="[^"]*\\.md[^"]*">(.*?)</a>', "\\1", html, perl = TRUE)
+  html <- gsub('<a href="(https?://)', '<a target="_blank" rel="noopener noreferrer" href="\\1',
+               html, perl = TRUE)
+  div(class = "dokument", HTML(html))
+}
+dokument_faner <- if (VIS_FULL_DOKUMENTASJON) {
+  list(
+    nav_panel("Teknisk dokumentasjon", br(), les_dokument("teknisk_dokumentasjon.md")),
+    nav_panel("Beslutningslogg", br(), les_dokument("beslutningslogg.md")),
+    nav_panel("Videre arbeid", br(), les_dokument("videre_arbeid.md"))
+  )
+} else list()
 
 ## ============================================================================
 ## Konfigurasjon: én oppføring per Y-variabel som kan velges i appen
@@ -347,7 +379,19 @@ ui <- page_sidebar(
     )
   ),
 
-  navset_tab(
+  tags$head(tags$style(HTML("
+    .dokument { max-width: 980px; line-height: 1.5; }
+    .dokument table { border-collapse: collapse; margin: 0.8em 0; display: block; overflow-x: auto; }
+    .dokument th, .dokument td { border: 1px solid #ccc; padding: 4px 8px; vertical-align: top; }
+    .dokument th { background: #f2f2f2; }
+    .dokument pre { background: #f6f6f6; padding: 8px 10px; overflow-x: auto; }
+    .dokument code { font-size: 0.9em; }
+    .dokument h1 { font-size: 1.6em; margin-top: 0; }
+    .dokument h2 { font-size: 1.3em; margin-top: 1.6em; }
+    .dokument h3 { font-size: 1.1em; }
+  "))),
+
+  do.call(navset_tab, c(list(
     nav_panel("Framskrivning",
       br(),
       plotlyOutput("plot_verdi", height = "480px")
@@ -364,6 +408,8 @@ ui <- page_sidebar(
         h4("Om denne visningen"),
         p("Viser observerte tall 2007-2025 og en framskrivning 2026-2050 for valgt variabel og kommune, basert på SSBs offisielle statistikk og befolkningsframskrivninger. Det skraverte feltet rundt framskrivningen viser et 95 % usikkerhetsintervall, der det er beregnet."),
         p("Du kan også slå på \"Bruk kommunens egen trend\" for å justere hvor lenge kommunens egen historiske utvikling skal påvirke framskrivningen, før den går over til det nasjonale gjennomsnittet."),
+        h5("Kort om metoden"),
+        p("Framskrivningen bygger på statistiske modeller som kobler kommunens historiske bruk av tjenestene til folketall og andelen eldre med økt behov, estimert på SSB-tall for 2007-2025. Modellene brukes sammen med SSBs befolkningsframskrivning til å beregne forventet etterspørsel fram til 2050, og det siste observerte året brukes som utgangspunkt slik at framskrivningen henger sammen med dagens nivå."),
         h5("Kjente begrensninger"),
         tags$ul(
           tags$li("For enkelte variabler er ett eller flere år utelatt fra beregningsgrunnlaget pga. datakvalitet - merkes i plottet der det er relevant."),
@@ -394,10 +440,15 @@ ui <- page_sidebar(
           tags$li(tags$b("11924, 14534"), " - sykepleiere, avtalte årsverk"),
           tags$li(tags$b("07459"), " - befolkning etter kommune, alder og kjønn"),
           tags$li(tags$b("12882"), " - SSBs befolkningsframskrivninger")
-        )
+        ),
+        if (VIS_FULL_DOKUMENTASJON) {
+          p("Modellbeskrivelse, begrunnelser for valg som er tatt og arbeidsplan ligger i fanene ",
+            tags$b("Teknisk dokumentasjon"), ", ", tags$b("Beslutningslogg"), " og ",
+            tags$b("Videre arbeid"), ". Dette er et pågående arbeid (beta), og dokumentene beskriver også kjente feil.")
+        }
       )
     )
-  )
+  ), dokument_faner))
 )
 
 ## ============================================================================

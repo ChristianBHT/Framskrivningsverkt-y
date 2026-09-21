@@ -8,9 +8,8 @@
 # (se app.R sin toppkommentar), ingen grunn til å laste dem opp.
 skript
 
-# Prosjektdokumentasjon - ikke en del av appen (se beslutningslogg.md
-# punkt 6: metodikk skal bevisst IKKE være tilgjengelig fra appen selv).
-dokumentasjon
+# NB: dokumentasjon/ lastes NÅ opp (vises som faner i appen, se
+# beslutningslogg.md punkt 14), så den står bevisst ikke her.
 
 # Vanlige lokale/IDE-filer.
 .Rproj.user

@@ -2,14 +2,16 @@
 
 Dette dokumentet beskriver de statistiske modellene som brukes til å
 framskrive Y_1, Y_2*, Y_4 og Y_5: likninger, estimeringsprosedyre,
-kryssvalideringsresultater, framskrivningsmetode og
-usikkerhetskvantifisering. For BEGRUNNELSENE bak disse valgene (hvorfor
+kryssvalideringsresultater, framskrivningsmetode,
+usikkerhetskvantifisering, en alternativ Y_5-modell (pkt. 9, med et kjent
+problem) og modellsjekk av befolkningskoeffisienten (pkt. 10). For BEGRUNNELSENE bak disse valgene (hvorfor
 Poisson, hvorfor intercept-only i kryssvalideringen men slope-modell i
 framskrivningen, hvorfor 2010 er utelatt for Y_1 osv.), se
 [beslutningslogg.md](beslutningslogg.md).
 
-**NB**: dette dokumentet er bevisst IKKE tilgjengelig fra selve
-Shiny-appen (`app.R`) - se punkt 6 i beslutningsloggen.
+**NB**: dette dokumentet vises som en fane i selve Shiny-appen (`app.R`),
+som er offentlig og uten innlogging - se punkt 14 i beslutningsloggen.
+(Tidligere var det bevisst holdt utenfor appen.)
 
 ## 1. Datagrunnlag
 
@@ -371,8 +373,108 @@ på bekostning av lengre kjøretid (hvert R-refit av `hovedmodell_slope` tar
 lengre tid enn intercept-only-varianten, pga. flere parametre og en
 korrelert tilfeldig helning).
 
-## 9. Kjente begrensninger / videre arbeid
+## 9. Alternativ Y_5-modell: Poisson (`modell_y5_poisson.R`, `framskriv_y5_poisson.R`) - KJENT PROBLEM
 
+**Hensikt**: alternativ estimering av Y_5 med samme modellfamilie som
+Y_1/Y_2\* (i stedet for log-lineær `lmer` i pkt. 5), vist som en egen linje
+uten konfidensintervall i appen.
+
+**Likning** (som pkt. 2, men på årsverk):
+
+```
+Y_5_ialt(k, t) ~ Poisson(μ_kt)
+log(μ_kt) = log(folk_ialt_kt) + β_0 + Σ_t γ_t · år_t + β_1 · demensandel_kt + u_k0 + u_k1 · demensandel_kt
+(u_k0, u_k1) ~ N(0, Σ)
+```
+
+Framskrivning, ankring og glidende overgang er nøyaktig som i pkt. 7
+(`hovedmodell_slope`, ankret ved 2025). Data: 2015-2025.
+
+**Ikke-heltall**: årsverk er ikke heltall, mens Poisson-likelihooden
+forutsetter det. Første versjon ble estimert på de uavrundede årsverkene
+(Poisson pseudo-likelihood).
+
+**Feil funnet: variansparametrene estimeres ikke.** For den uavrundede
+modellen står `theta` på lme4s startverdier (1, 0, 1) - dvs.
+tilfeldig-intercept-SD = 1, tilfeldig-helning-SD = 1 og korrelasjon 0 - og
+optimereren melder "Gradient contains NAs". Samme resultat fås for en ren
+intercept-modell på de samme dataene. Konsekvenser:
+
+| | Uavrundet (i appen nå) | Avrundet til heltall (test) |
+|---|---|---|
+| Tilfeldig intercept, SD | 1 (startverdi) | 0,577 |
+| Tilfeldig helning, SD | 1 (startverdi) | 24,95 |
+| Korrelasjon | 0 (startverdi) | -0,913 |
+| Intercept (β_0) | -5,034 | -5,443 |
+| `demensandel` (β_1) | 3,66 | 21,74 |
+| Kommuner med negativ effektiv helning | ikke meningsfullt | 32 / 357 |
+| Konvergens | "Gradient contains NAs" | Advarsel: maks funksjonskall nådd, maks \|grad\| 0,0101 (toleranse 0,002) |
+
+Kryssvalideringen for den uavrundede modellen (RMSE 14,07, MAE 5,57,
+korrelasjon 0,9974, n = 3 898) ser fornuftig ut, men sier ingenting om at
+variansparametrene er riktig estimert. **Modellen og alternativlinjen i
+appen skal ikke tolkes** før dette er rettet. Neste steg: avrunding (eller
+en Gamma-modell med log-lenke) med høyere `maxfun`, ny CV, kjøre
+`framskriv_y5_poisson.R` på nytt.
+
+## 10. Modellsjekk av koeffisienten på log(befolkning) (`modellsjekk_kvantil.R`)
+
+Modellene bruker `offset(log(folk_ialt))`, dvs. koeffisienten på
+log(befolkning) er tvunget til 1. Sjekken lar den estimeres fritt og
+undersøker om den avviker fra 1. Trekkes log(befolkning) fra begge sider av
+`log(y) = β_pop · log(pop) + X·β` får vi
+
+```
+log(y / befolkning) = (β_pop - 1) · log(befolkning) + X·β
+```
+
+og hypotesen β_pop = 1 blir at koeffisienten på `log(befolkning)` er 0.
+
+**Estimering**: kvantilregresjon (`quantreg::rq`, metode `br`) på
+
+```
+log(y / befolkning) ~ log(befolkning) + demensandel + år (dummyer)
+```
+
+for τ ∈ {0,1; 0,25; 0,5; 0,75; 0,9}. Observasjoner med y = 0 utelates
+(2 av 6 337 for Y_1); Y_1 bruker samme utvalg som `modell_y1.R` (uten 2010).
+
+**Usikkerhet**: Bayesiansk bootstrap over kommuner, B = 100. For hver
+iterasjon trekkes `w_k = K · g_k / Σ_j g_j` med `g_k ~ Gamma(1, 1)`, samme
+vekt for alle år i kommune k, og alle kvantilregresjonene estimeres på nytt
+med `weights = w_k`. Hele fordelingen for `log(befolkning)`-koeffisienten
+lagres (`data/ssb/modellsjekk_kvantil_y_1.rds`).
+
+**Resultat, Y_1** (alle 100 iterasjoner fullført):
+
+| τ | β_pop | 95 % intervall | Andel trekk med β_pop < 1 |
+|---|---|---|---|
+| 0,10 | 1,001 | [0,985, 1,021] | 0,51 |
+| 0,25 | 0,974 | [0,958, 0,993] | 0,99 |
+| 0,50 | 0,949 | [0,931, 0,967] | 1,00 |
+| 0,75 | 0,916 | [0,898, 0,934] | 1,00 |
+| 0,90 | 0,894 | [0,878, 0,913] | 1,00 |
+
+Bootstrap-SD er ca. 0,01 for alle kvantiler. Proporsjonalitet forkastes fra
+medianen og oppover; ved den laveste kvantilen er den forenlig med dataene.
+
+**Begrensninger**: ingen tilfeldige effekter eller kommune-faste effekter
+(koeffisienten hentes hovedsakelig fra forskjeller mellom kommuner, siden
+folketallet varierer lite over tid innen en kommune); `rq` gir advarselen
+"Solution may be nonunique" (vanlig med årsdummyer og like verdier, ikke
+undersøkt nærmere); bootstrap-intervallene fanger bare
+utvalgsvariasjon mellom kommuner. Kun Y_1 er kjørt. En fri koeffisient
+er ikke innført i framskrivningene - det krever at ankerformelen får
+leddet `β_pop · (log(pop_t) - log(pop_anker))`.
+
+## 11. Kjente begrensninger / videre arbeid
+
+Se også [videre_arbeid.md](videre_arbeid.md) for arbeidsplanen.
+
+- **Den alternative Y_5-modellen (pkt. 9) er ikke gyldig estimert** -
+  variansparametrene er ikke estimert. Rettes før bruk.
+- Koeffisienten på log(befolkning) avviker fra 1 for Y_1 (pkt. 10) men er
+  ikke innført i modellene; Y_2\* og Y_5 er ikke sjekket.
 - `Y_3` er ikke modellert som egen variabel (kun som del av `Y_2*`).
 - `framskriv_y4.R` er ikke skrevet - `Y_4`s svake prediktive treffsikkerhet
   (korrelasjon ~0,74) gjør at videre arbeid her bør vurderes nøye før
