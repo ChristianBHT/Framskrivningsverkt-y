@@ -1,4 +1,4 @@
-# Beslutningslogg - Omsorg 2050 / Framskrivningsverktøy
+# Beslutningslogg - Telemarksforsknings Framskrivningsverktøy (Fram)
 
 Dette er en samlet, begrunnet logg over de viktigste valgene som er tatt i
 dette prosjektet: datakilder, metodevalg, funn under validering, og

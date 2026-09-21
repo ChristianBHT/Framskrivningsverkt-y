@@ -96,6 +96,13 @@ Y_VARIABLER <- list(
     nedre_kolonne = "y5_nedre",
     ovre_kolonne = "y5_ovre",
     modell_slope_fil = "modell_y5_hovedmodell_slope.rds",
+    ## Alternativ estimering vist i SAMME plott (uten usikkerhetsbånd) - se
+    ## modell_y5_poisson.R / framskriv_y5_poisson.R.
+    alternativ = list(
+      framskrevet_fil = "framskrevet_y5_poisson.rds",
+      framskrevet_kolonne = "y5p_predikert",
+      modell_slope_fil = "modell_y5p_hovedmodell_slope.rds"
+    ),
     flagg_2010 = FALSE
   )
 )
@@ -189,10 +196,22 @@ for (id in names(Y_VARIABLER)) {
     left_join(demensandel_anker, by = "kommunenr_2024")
 }
 
-framskriv_trend <- function(variabel_id, T) {
+## ---- Alternative estimeringer (kun vist i plottet, uten usikkerhetsbånd) ----
+## Samme oppsett som over: populasjon/demensandel/anker og siste observerte
+## verdi er felles med hovedvarianten av samme variabel.
+alternativ_id <- Filter(function(id) !is.null(Y_VARIABLER[[id]]$alternativ), names(Y_VARIABLER))
+alternativ_framskrevet_liste <- list()
+alternativ_modell_liste <- list()
+for (id in alternativ_id) {
+  alt <- Y_VARIABLER[[id]]$alternativ
+  alternativ_framskrevet_liste[[id]] <- readRDS(file.path(utmappe, alt$framskrevet_fil))
+  alternativ_modell_liste[[id]] <- readRDS(file.path(utmappe, alt$modell_slope_fil))
+}
+
+framskriv_trend <- function(variabel_id, T, alternativ = FALSE) {
   v <- Y_VARIABLER[[variabel_id]]
-  modell_slope <- modell_slope_liste[[variabel_id]]
-  verdi_kolonne <- v$framskrevet_kolonne
+  modell_slope <- if (alternativ) alternativ_modell_liste[[variabel_id]] else modell_slope_liste[[variabel_id]]
+  verdi_kolonne <- if (alternativ) v$alternativ$framskrevet_kolonne else v$framskrevet_kolonne
   d0 <- framtidsdata_liste[[variabel_id]]
   siste_observert <- siste_observert_liste[[variabel_id]]
 
@@ -257,7 +276,11 @@ KOMMUNE_STANDARD <- if ("3101" %in% kommuner_tilgjengelig) "3101" else kommuner_
 ## allerede beregnet data.frame for ALLE kommuner, med samme kolonner som
 ## framskrevet_liste sine oppføringer. Når denne er satt, finnes det ikke
 ## noe usikkerhetsbånd (bootstrap er ikke kjørt for denne varianten).
-lag_tidsserie <- function(kommune, variabel_id, framskrevet_override = NULL) {
+## `alternativ_override`: tilsvarende trend-variant av den alternative
+## estimeringen (kun for variabler med `alternativ` i Y_VARIABLER); hvis NULL
+## brukes den ferdigberegnede alternative framskrivningen (T = 0).
+lag_tidsserie <- function(kommune, variabel_id, framskrevet_override = NULL,
+                          alternativ_override = NULL) {
   v <- Y_VARIABLER[[variabel_id]]
   framskrevet <- if (!is.null(framskrevet_override)) framskrevet_override else framskrevet_liste[[variabel_id]]
   usikkerhet <- if (!is.null(framskrevet_override)) NULL else usikkerhet_liste[[variabel_id]]
@@ -280,7 +303,17 @@ lag_tidsserie <- function(kommune, variabel_id, framskrevet_override = NULL) {
   } else {
     proj |> mutate(nedre = NA_real_, ovre = NA_real_)
   }
-  bind_rows(obs, proj) |> arrange(år)
+
+  alt <- NULL
+  if (!is.null(v$alternativ)) {
+    alt_data <- if (!is.null(alternativ_override)) alternativ_override else alternativ_framskrevet_liste[[variabel_id]]
+    alt <- alt_data |>
+      filter(kommunenr_2024 == kommune) |>
+      transmute(år, kilde = "Alternativ modell (MMMM)",
+                verdi = .data[[v$alternativ$framskrevet_kolonne]],
+                folk_ialt, demensandel, nedre = NA_real_, ovre = NA_real_)
+  }
+  bind_rows(obs, proj, alt) |> arrange(år)
 }
 
 ## ============================================================================
@@ -383,7 +416,11 @@ server <- function(input, output, session) {
   tidsserie <- reactive({
     req(input$kommune, input$variabel)
     override <- if (isTRUE(input$bruk_trend)) framskrevet_trend_reaktiv() else NULL
-    lag_tidsserie(input$kommune, input$variabel, framskrevet_override = override)
+    alt_override <- if (isTRUE(input$bruk_trend) && !is.null(Y_VARIABLER[[input$variabel]]$alternativ)) {
+      framskriv_trend(input$variabel, input$trend_T, alternativ = TRUE)
+    } else NULL
+    lag_tidsserie(input$kommune, input$variabel, framskrevet_override = override,
+                  alternativ_override = alt_override)
   })
 
   output$plot_verdi <- renderPlotly({
@@ -402,6 +439,7 @@ server <- function(input, output, session) {
     farger <- c(
       "Observert" = "#0072B2",
       "Framskrevet (MMMM)" = "#D55E00",
+      "Alternativ modell (MMMM)" = "#009E73",
       "2010 (utelatt fra modell)" = "grey50"
     )
 
@@ -424,7 +462,7 @@ server <- function(input, output, session) {
       p <- p |> add_trace(
         data = sub, x = ~år, y = ~verdi, type = "scatter", mode = "lines+markers",
         name = g,
-        line = list(color = farger[[g]], dash = if (sub$kilde[1] == "Framskrevet (MMMM)") "dash" else "solid"),
+        line = list(color = farger[[g]], dash = if (sub$kilde[1] == "Framskrevet (MMMM)") "dash" else if (sub$kilde[1] == "Alternativ modell (MMMM)") "dot" else "solid"),
         marker = list(color = farger[[g]])
       )
     }
