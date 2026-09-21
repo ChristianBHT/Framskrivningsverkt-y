@@ -2,3 +2,7 @@
 .Rhistory
 .RData
 .Ruserdata
+
+# Stor rådatafil (~120 MB) - over GitHubs grense på 100 MB per fil.
+# Genereres av skript/hent_paneldata_2007_2025.R / legg_til_demens.R.
+data/ssb/07459.csv
