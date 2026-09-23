@@ -44,9 +44,9 @@ for mye enn for lite. Sjekk alltid sitatet mot originalen før du bruker det.
   nettsiden (404). Kongsbergs livsfasepolitikk ligger bare i en
   dokumentviser (Elements) og er ikke hentet.
 - Utvidelsen 2026-09-23 la til 54 dokumenter etter gjennomgang av hver
-  kommunes planside. Den oppdaterte vurderingen (alle 103) ligger i Claude-
-  dokumentet «Demografi i planverket – Buskerud»;
-  `dokumentasjon/planverk_buskerud_vurdering.md` er første versjon (49).
+  kommunes planside. Vurderingen av alle 103 ligger i
+  `dokumentasjon/planverk_buskerud_vurdering.md` (lokal kopi av
+  Claude-dokumentet «Demografi i planverket – Buskerud», per 2026-09-23).
 
 ## Hva planene sier om demografi (kort)
 
