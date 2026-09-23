@@ -62,6 +62,9 @@ oppstart (faller tilbake til kommunenummer uten internett).
   i hjemmet) og plotter de 10 største kommunene
 - `modell_y4.R` - modell for Y_4 (timer/uke); ingen framskrivning ennå,
   svak modellfit
+- `hent_planverk_buskerud.R` - laster ned og konverterer samfunnsdel,
+  planstrategi og kunnskapsgrunnlag for de 18 Buskerud-kommunene og
+  trekker ut demografiavsnitt (se `data/planverk/buskerud/README.md`)
 - `deploy_shinyapps.R` - publisering
 
 ## Publisere

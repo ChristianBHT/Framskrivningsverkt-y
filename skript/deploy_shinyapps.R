@@ -36,7 +36,11 @@ appfiler <- c(
     # Alternativ Y_5-modell (Poisson) - se dokumentasjon/beslutningslogg.md
     # pkt. 11: NB modellen er foreløpig ikke gyldig estimert.
     "framskrevet_y5_poisson.rds",
-    "modell_y5p_hovedmodell_slope.rds"
+    "modell_y5p_hovedmodell_slope.rds",
+    # Fanen "Analyse stordriftsfordeler" (skript/modellsjekk_kvantil.R)
+    "modellsjekk_kvantil_y_1_sammendrag.rds",
+    "modellsjekk_kvantil_y_2_stjerne_sammendrag.rds",
+    "modellsjekk_kvantil_y_5_sammendrag.rds"
   ))
 )
 stopifnot(all(file.exists(appfiler)))

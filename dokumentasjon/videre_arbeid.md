@@ -231,7 +231,13 @@ opphevet, se pkt. 14; valget om script fremfor fane står ved lag).
       Kjørt for Y_1: β_pop ≈ 1,00 ved τ = 0,1, men 0,974 / 0,949 / 0,916 /
       0,894 ved τ = 0,25 / 0,5 / 0,75 / 0,9, med intervaller som utelukker
       1 (se beslutningslogg pkt. 13).
-- [ ] Kjør for Y_2\* og Y_5 (`VARIABEL` i scriptet).
+- [x] Kjørt for Y_2\* og Y_5 (variabel gis som kommandolinjeargument).
+      Resultatene vises i appen i fanen "Analyse stordriftsfordeler"
+      (beslutningslogg pkt. 15).
+- [ ] Undersøk om de STØRSTE kommunene har stordriftsfordeler: kvantilene i
+      analysen rangerer etter bruk per innbygger, ikke størrelse. Krever
+      f.eks. en helning på log(folketall) som varierer med størrelse, eller
+      separate estimater for størrelsesgrupper.
 - [ ] Legg til en gjennomsnittsregresjon som referanse, og sjekk om
       "Solution may be nonunique"-advarselen fra `rq` har betydning.
 - [ ] Vurder kommune-faste effekter, slik at koeffisienten også kan hentes

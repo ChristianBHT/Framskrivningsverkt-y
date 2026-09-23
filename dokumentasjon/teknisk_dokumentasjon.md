@@ -458,12 +458,30 @@ lagres (`data/ssb/modellsjekk_kvantil_y_1.rds`).
 Bootstrap-SD er ca. 0,01 for alle kvantiler. Proporsjonalitet forkastes fra
 medianen og oppover; ved den laveste kvantilen er den forenlig med dataene.
 
+**Resultat, Y_2\*** (5 167 kommune-år, 100/100 iterasjoner) og **Y_5**
+(3 898 kommune-år, 100/100 iterasjoner):
+
+| τ | β_pop Y_2\* | 95 % intervall | β_pop Y_5 | 95 % intervall |
+|---|---|---|---|---|
+| 0,10 | 1,041 | [1,016, 1,066] | 0,957 | [0,904, 0,996] |
+| 0,25 | 1,011 | [0,984, 1,031] | 0,930 | [0,904, 0,957] |
+| 0,50 | 0,964 | [0,941, 0,984] | 0,907 | [0,882, 0,939] |
+| 0,75 | 0,914 | [0,884, 0,946] | 0,885 | [0,866, 0,908] |
+| 0,90 | 0,892 | [0,858, 0,915] | 0,865 | [0,840, 0,889] |
+
+Alle tre variabler viser at β_pop faller fra lave til høye kvantiler. Y_2\*
+ligger over 1 ved τ = 0,1, og Y_5 under 1 for alle kvantiler. Tolkning:
+β_pop < 1 = bruken vokser saktere enn folketallet (stordriftsfordeler).
+**Kvantilene rangerer kommuner etter bruk per innbygger, ikke etter
+størrelse.** Resultatene vises i appen i fanen "Analyse stordriftsfordeler"
+(beslutningslogg pkt. 15).
+
 **Begrensninger**: ingen tilfeldige effekter eller kommune-faste effekter
 (koeffisienten hentes hovedsakelig fra forskjeller mellom kommuner, siden
 folketallet varierer lite over tid innen en kommune); `rq` gir advarselen
 "Solution may be nonunique" (vanlig med årsdummyer og like verdier, ikke
 undersøkt nærmere); bootstrap-intervallene fanger bare
-utvalgsvariasjon mellom kommuner. Kun Y_1 er kjørt. En fri koeffisient
+utvalgsvariasjon mellom kommuner. Y_1, Y_2\* og Y_5 er kjørt. En fri koeffisient
 er ikke innført i framskrivningene - det krever at ankerformelen får
 leddet `β_pop · (log(pop_t) - log(pop_anker))`.
 
@@ -473,8 +491,8 @@ Se også [videre_arbeid.md](videre_arbeid.md) for arbeidsplanen.
 
 - **Den alternative Y_5-modellen (pkt. 9) er ikke gyldig estimert** -
   variansparametrene er ikke estimert. Rettes før bruk.
-- Koeffisienten på log(befolkning) avviker fra 1 for Y_1 (pkt. 10) men er
-  ikke innført i modellene; Y_2\* og Y_5 er ikke sjekket.
+- Koeffisienten på log(befolkning) avviker fra 1 for Y_1, Y_2\* og Y_5
+  (pkt. 10) men er ikke innført i modellene.
 - `Y_3` er ikke modellert som egen variabel (kun som del av `Y_2*`).
 - `framskriv_y4.R` er ikke skrevet - `Y_4`s svake prediktive treffsikkerhet
   (korrelasjon ~0,74) gjør at videre arbeid her bør vurderes nøye før

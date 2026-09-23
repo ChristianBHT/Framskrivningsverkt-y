@@ -172,6 +172,20 @@ usikkerhet_liste <- lapply(Y_VARIABLER, function(v) {
   readRDS(file.path(utmappe, v$usikkerhet_fil))
 })
 
+## ---- Analyse stordriftsfordeler (resultater fra skript/modellsjekk_kvantil.R) ----
+## Kompakte sammendragsfiler, én per variabel. Mangler en fil, utelates
+## variabelen (og fanen viser en melding hvis ingen finnes).
+stordrift <- bind_rows(lapply(names(Y_VARIABLER), function(id) {
+  fil <- file.path(utmappe, paste0("modellsjekk_kvantil_", tolower(id), "_sammendrag.rds"))
+  if (!file.exists(fil)) return(NULL)
+  x <- readRDS(fil)
+  x$sammendrag |>
+    transmute(variabel = id,
+              navn = sub("^Etterspørsel etter ", "", Y_VARIABLER[[id]]$navn),
+              tau, beta = beta_pop_estimat, nedre = beta_pop_nedre95,
+              ovre = beta_pop_ovre95, andel_under_1 = p_under_0, n = x$n)
+}))
+
 ## ============================================================================
 ## Kommunespesifikk trend (tilfeldig helning på demensandel) - alle variabler
 ## ============================================================================
@@ -447,6 +461,21 @@ ui <- page_sidebar(
             tags$b("Videre arbeid"), ". Dette er et pågående arbeid (beta), og dokumentene beskriver også kjente feil.")
         }
       )
+    ),
+    nav_panel("Analyse stordriftsfordeler",
+      br(),
+      div(class = "dokument",
+        h4("Analyse stordriftsfordeler"),
+        p("Spørsmålet er om store kommuner bruker mindre tjenester per innbygger enn små, altså om det er stordriftsfordeler. Analysen ser på hvordan bruk per innbygger henger sammen med folketallet, for ulike deler av fordelingen av bruk per innbygger (kvantiler), etter at det er tatt hensyn til andelen eldre med økt behov og utviklingen over år."),
+        p(tags$b("Hvordan lese figuren: "), "Tallet på den loddrette aksen (β) sier hvor mye bruken vokser når folketallet vokser. β = 1 betyr at bruken vokser like mye som folketallet (ingen stordriftsfordeler). β under 1 betyr at bruken vokser saktere enn folketallet, slik at større kommuner bruker mindre per innbygger (stordriftsfordeler); en kommune med 10 % flere innbyggere har da omtrent β × 10 % høyere bruk. Vertikale streker viser 95 % usikkerhetsintervall."),
+        p(tags$b("Merk: "), "Kvantilene (0,1 til 0,9) rangerer kommunene etter bruk per innbygger, ikke etter størrelse. Høy kvantil (0,9) betyr kommuner med høy bruk per innbygger, uavhengig av hvor store de er."),
+        plotlyOutput("plot_stordrift", height = "420px"),
+        br(),
+        DTOutput("tabell_stordrift"),
+        br(),
+        tags$small(class = "text-muted",
+          "Analysen sammenligner kommuner med hverandre og sier lite om utvikling over tid i én og samme kommune. Andre forskjeller mellom kommuner er ikke kontrollert for, så resultatet viser en sammenheng, ikke nødvendigvis en årsak. Usikkerheten er beregnet ved gjentatt trekking av kommuner (100 trekk).")
+      )
     )
   ), dokument_faner))
 )
@@ -530,6 +559,42 @@ server <- function(input, output, session) {
     datatable(d, rownames = FALSE, options = list(pageLength = 15)) |>
       formatRound(columns = c("verdi", "folk_ialt", "nedre", "ovre"), digits = 0) |>
       formatPercentage(columns = "demensandel", digits = 2)
+  })
+
+  output$plot_stordrift <- renderPlotly({
+    validate(need(nrow(stordrift) > 0, "Analysen er ikke tilgjengelig."))
+    navn <- unique(stordrift$navn)
+    farger_s <- setNames(c("#0072B2", "#D55E00", "#009E73")[seq_along(navn)], navn)
+    forskyvning <- setNames(c(-0.012, 0, 0.012)[seq_along(navn)], navn)
+    p <- plot_ly()
+    for (n in navn) {
+      d <- stordrift[stordrift$navn == n, ]
+      p <- p |> add_trace(
+        x = d$tau + forskyvning[[n]], y = d$beta, type = "scatter", mode = "lines+markers",
+        name = n, line = list(color = farger_s[[n]]), marker = list(color = farger_s[[n]]),
+        error_y = list(type = "data", symmetric = FALSE, array = d$ovre - d$beta,
+                       arrayminus = d$beta - d$nedre, color = farger_s[[n]]),
+        text = sprintf("Kvantil %.2f: β = %.3f [%.3f, %.3f]", d$tau, d$beta, d$nedre, d$ovre),
+        hoverinfo = "text"
+      )
+    }
+    p |> layout(
+      xaxis = list(title = "Kvantil av bruk per innbygger", tickvals = sort(unique(stordrift$tau))),
+      yaxis = list(title = "β (bruk vs. folketall)"),
+      shapes = list(list(type = "line", xref = "paper", x0 = 0, x1 = 1, y0 = 1, y1 = 1,
+                         line = list(color = "grey40", dash = "dash", width = 1))),
+      legend = list(orientation = "h", y = 1.12, x = 0)
+    )
+  })
+
+  output$tabell_stordrift <- renderDT({
+    validate(need(nrow(stordrift) > 0, "Analysen er ikke tilgjengelig."))
+    tab <- stordrift |>
+      transmute(Variabel = navn, Kvantil = tau, `β` = round(beta, 3),
+                `95 % intervall` = sprintf("[%.3f, %.3f]", nedre, ovre),
+                `Andel trekk med β under 1` = round(andel_under_1, 2),
+                `Antall kommune-år` = n)
+    datatable(tab, rownames = FALSE, options = list(dom = "t", pageLength = 20, ordering = FALSE))
   })
 
   output$last_ned <- downloadHandler(

@@ -458,3 +458,42 @@ modellenes formler og estimeringsdetaljer, se
   generelt avsnitt ("Kort om metoden", alltid synlig) uten formler,
   modelltyper eller filnavn. Ved overgang til endelig versjon: sett bryteren
   til `FALSE` og fjern `dokumentasjon/*.md` fra `skript/deploy_shinyapps.R`.
+
+## 15. Analyse av stordriftsfordeler (fane i appen) (2026-09-21)
+
+- **Bestilling**: kjør modellsjekken (punkt 13) også for Y_2\* og Y_5, og vis
+  resultatene for Y_1, Y_2\* og Y_5 i en egen fane, "Analyse stordriftsfordeler".
+  Dette er en bevisst reversering av valget i punkt 13 om ikke å ha
+  modellsjekker i appen - nå gjelder det denne ene analysen, som vises åpent.
+- **Tolkning**: β_pop < 1 betyr at bruken vokser saktere enn folketallet, dvs.
+  at større kommuner bruker mindre per innbygger (stordriftsfordeler).
+  **Presisering**: kvantilene τ rangerer kommunene etter *bruk per innbygger*
+  (justert for `demensandel` og år), IKKE etter kommunestørrelse. "Høy
+  kvantil" betyr høy bruk per innbygger, ikke store kommuner. Dette står også
+  eksplisitt i fanen. Å undersøke om de STØRSTE kommunene har
+  stordriftsfordeler ville krevd en annen analyse (f.eks. flere hellingsledd
+  eller å dele utvalget etter størrelse).
+- **Resultat** (β_pop, 95 % bootstrap-intervall, B = 100 per variabel):
+
+| Variabel | τ = 0,1 | τ = 0,25 | τ = 0,5 | τ = 0,75 | τ = 0,9 |
+|---|---|---|---|---|---|
+| Hjemmetjenester (Y_1) | 1,001 [0,985, 1,021] | 0,974 [0,958, 0,993] | 0,949 [0,931, 0,967] | 0,916 [0,898, 0,934] | 0,894 [0,878, 0,913] |
+| Bolig (Y_2\*) | 1,041 [1,016, 1,066] | 1,011 [0,984, 1,031] | 0,964 [0,941, 0,984] | 0,914 [0,884, 0,946] | 0,892 [0,858, 0,915] |
+| Sykepleier, årsverk (Y_5) | 0,957 [0,904, 0,996] | 0,930 [0,904, 0,957] | 0,907 [0,882, 0,939] | 0,885 [0,866, 0,908] | 0,865 [0,840, 0,889] |
+
+  - Mønsteret er likt for alle tre: β_pop faller jevnt fra lave til høye
+    kvantiler. For Y_1 og Y_2\* er lav kvantil forenlig med proporsjonalitet
+    (Y_2\* er til og med litt over 1 ved τ = 0,1, altså det motsatte av
+    stordriftsfordeler), mens de høye kvantilene ligger klart under 1.
+  - Y_5 (sykepleierårsverk) skiller seg ut ved å ligge under 1 for alle
+    kvantiler, også den laveste.
+- **Forbehold** (som i punkt 13): ingen kommune-faste effekter, så resultatet
+  sammenligner kommuner med hverandre og sier lite om utvikling over tid i
+  samme kommune; sammenheng, ikke nødvendigvis årsak. Y_5 dekker bare
+  2015-2025.
+- **Teknisk**: `modellsjekk_kvantil.R` tar variabelen som kommandolinjeargument
+  og lagrer en kompakt sammendragsfil per variabel
+  (`modellsjekk_kvantil_<var>_sammendrag.rds`) som appen leser; de fulle
+  `rq`-modellene leses ikke av appen og lastes ikke opp.
+- Fanen vises uavhengig av bryteren `VIS_FULL_DOKUMENTASJON` (punkt 14). Den
+  er ikke redeployet ennå.

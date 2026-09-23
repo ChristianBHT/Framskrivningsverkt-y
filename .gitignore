@@ -6,3 +6,7 @@
 # Stor rådatafil (~120 MB) - over GitHubs grense på 100 MB per fil.
 # Genereres av skript/hent_paneldata_2007_2025.R / legg_til_demens.R.
 data/ssb/07459.csv
+
+# Nedlastede plan-PDF-er (~200 MB) - lastes ned på nytt av
+# skript/hent_planverk_buskerud.R.
+data/planverk/buskerud/pdf/

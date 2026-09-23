@@ -1,6 +1,6 @@
 # modellsjekk_kvantil.R
 #
-# MODELLSJEKK (frittstående script, ikke en del av appen): er koeffisienten
+# MODELLSJEKK: er koeffisienten
 # på log(befolkning) lik 1?
 #
 # Alle Poisson-/log-lineære modellene bruker offset(log(folk_ialt)), dvs.
@@ -39,7 +39,10 @@ library(dplyr)
 
 utmappe <- file.path("data", "ssb")
 
-VARIABEL <- "Y_1"                          # "Y_1", "Y_2_stjerne" eller "Y_5"
+## Variabel kan gis som kommandolinjeargument:
+##   Rscript skript/modellsjekk_kvantil.R Y_2_stjerne
+args <- commandArgs(trailingOnly = TRUE)
+VARIABEL <- if (length(args) >= 1) args[1] else "Y_1"   # "Y_1", "Y_2_stjerne" eller "Y_5"
 TAU <- c(0.1, 0.25, 0.5, 0.75, 0.9)        # kvantiler som estimeres
 
 ## ============================================================================
@@ -150,4 +153,9 @@ saveRDS(list(variabel = VARIABEL, tau = TAU, formel = FORMEL, modell = modell,
              B = B, seed = SEED, boot_logpop = boot_logpop, boot_demensandel = boot_demens,
              sammendrag = sammendrag),
         file.path(utmappe, paste0("modellsjekk_kvantil_", tolower(VARIABEL), ".rds")))
+## Kompakt sammendrag (uten selve rq-modellen) som appen leser i fanen
+## "Analyse stordriftsfordeler".
+saveRDS(list(variabel = VARIABEL, n = nrow(d), n_null_utelatt = n_null, B = B,
+             sammendrag = sammendrag),
+        file.path(utmappe, paste0("modellsjekk_kvantil_", tolower(VARIABEL), "_sammendrag.rds")))
 message("\nLagret modellsjekk_kvantil_", tolower(VARIABEL), ".rds i ", normalizePath(utmappe))

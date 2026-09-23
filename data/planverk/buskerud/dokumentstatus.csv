@@ -1,0 +1,104 @@
+kommunenr,kommune,fil,dokumenttype,format,nedlasting,sider,demografi_avsnitt
+3301,Drammen,3301_drammen_samfunnsdel_2021-2040,samfunnsdel,pdf,finnes,28,12
+3301,Drammen,3301_drammen_drammenstrender_2023,kunnskapsgrunnlag,pdf,finnes,203,0
+3303,Kongsberg,3303_kongsberg_samfunnsdel_2026-2040,samfunnsdel,pdf,finnes,28,8
+3303,Kongsberg,3303_kongsberg_planstrategi_2024-2027,planstrategi,pdf,finnes,45,14
+3303,Kongsberg,3303_kongsberg_befolkningsframskriving_prognosesenteret,kunnskapsgrunnlag,pdf,finnes,43,39
+3305,Ringerike,3305_ringerike_samfunnsdel_2021-2030,samfunnsdel,pdf,finnes,56,6
+3305,Ringerike,3305_ringerike_samfunnsdel_2021-2030_bakgrunn,kunnskapsgrunnlag,pdf,finnes,48,12
+3305,Ringerike,3305_ringerike_areal_befolkning_boliger,kunnskapsgrunnlag,pdf,finnes,12,2
+3310,Hole,3310_hole_samfunnsdel_2018-2030,samfunnsdel,pdf,finnes,16,5
+3312,Lier,3312_lier_samfunnsdel_2019-2028,samfunnsdel,pdf,finnes,13,12
+3312,Lier,3312_lier_samfunnsdel_2040_horing,samfunnsdel,pdf,finnes,23,8
+3312,Lier,3312_lier_planstrategi_2024-2027,planstrategi,pdf,finnes,21,6
+3312,Lier,3312_lier_kunnskapsgrunnlag_2023,kunnskapsgrunnlag,pdf,finnes,54,16
+3312,Lier,3312_lier_temaplan_helse_omsorg_velferd_2026-2034_horing,helse_omsorg,pdf,finnes,27,17
+3314,Øvre Eiker,3314_ovre-eiker_samfunnsdel_2021-2033,samfunnsdel,pdf,finnes,33,14
+3314,Øvre Eiker,3314_ovre-eiker_planstrategi_2025-2028_utkast,planstrategi,pdf,finnes,26,12
+3314,Øvre Eiker,3314_ovre-eiker_strategi_helse_velferd_2025-2035,helse_omsorg,pdf,finnes,9,3
+3316,Modum,3316_modum_samfunnsdel_2022-2032,samfunnsdel,pdf,finnes,41,12
+3318,Krødsherad,3318_krodsherad_samfunnsdel_2019-2032,samfunnsdel,pdf,finnes,20,7
+3318,Krødsherad,3318_krodsherad_planstrategi_2024-2027,planstrategi,pdf,finnes,26,10
+3318,Krødsherad,3318_krodsherad_planstrategi_2024-2027_vedlegg3,planstrategi,pdf,finnes,14,3
+3320,Flå,3320_flaa_samfunnsdel_2022-2034,samfunnsdel,pdf,finnes,24,7
+3322,Nesbyen,3322_nesbyen_samfunnsdel_2018-2030,samfunnsdel,pdf,finnes,39,16
+3322,Nesbyen,3322_nesbyen_samfunnsdel_statistikk,kunnskapsgrunnlag,pdf,finnes,12,15
+3322,Nesbyen,3322_nesbyen_planstrategi_2024-2027,planstrategi,pdf,finnes,16,4
+3324,Gol,3324_gol_samfunnsdel_2018-2030,samfunnsdel,pdf,finnes,16,15
+3324,Gol,3324_gol_kunnskapsgrunnlag_2018-2030,kunnskapsgrunnlag,pdf,finnes,2,0
+3324,Gol,3324_gol_planstrategi_2024-2027,planstrategi,pdf,finnes,20,20
+3324,Gol,3324_gol_planprogram_samfunnsdel_2026-2038,planprogram,pdf,finnes,6,2
+3326,Hemsedal,3326_hemsedal_samfunnsdel_2019-2030,samfunnsdel,pdf,finnes,16,14
+3326,Hemsedal,3326_hemsedal_planstrategi_2024-2027,planstrategi,pdf,finnes,12,3
+3328,Ål,3328_aal_kommuneplan_2015-2027_tekstdel,samfunnsdel,pdf,finnes,24,5
+3328,Ål,3328_aal_planstrategi_2024-2027,planstrategi,pdf,finnes,18,0
+3330,Hol,3330_hol_samfunnsdel_2018-2030,samfunnsdel,pdf,finnes,36,13
+3330,Hol,3330_hol_planstrategi_2024-2027,planstrategi,pdf,finnes,32,18
+3330,Hol,3330_hol_kommunedelplan_helse_omsorg_2025-2037,helse_omsorg,pdf,finnes,17,8
+3332,Sigdal,3332_sigdal_samfunnsdel_2022-2035,samfunnsdel,pdf,finnes,28,8
+3332,Sigdal,3332_sigdal_planstrategi_2024-2027,planstrategi,pdf,finnes,34,18
+3334,Flesberg,3334_flesberg_samfunnsdel_2025-2040,samfunnsdel,framsikt,hentet,4,20
+3334,Flesberg,3334_flesberg_kunnskapsgrunnlag,kunnskapsgrunnlag,framsikt,hentet,8,63
+3334,Flesberg,3334_flesberg_planstrategi_planprogram_samfunnsdel,planstrategi,pdf,finnes,8,1
+3336,Rollag,3336_rollag_samfunnsdel_2023-2033,samfunnsdel,framsikt,hentet,7,9
+3336,Rollag,3336_rollag_samfunnsdel_2023-2033_saerutskrift,vedtak,pdf,finnes,7,2
+3336,Rollag,3336_rollag_planprogram_samfunnsdel_2021-2033,planprogram,pdf,finnes,35,16
+3336,Rollag,3336_rollag_planstrategi_2020-2023,planstrategi,pdf,finnes,35,17
+3338,Nore og Uvdal,3338_nore-og-uvdal_samfunnsdel_tett_paa_folk,samfunnsdel,pdf,finnes,19,1
+3338,Nore og Uvdal,3338_nore-og-uvdal_temaplan_helse_omsorg_2025-2030,helse_omsorg,pdf,finnes,15,21
+3338,Nore og Uvdal,3338_nore-og-uvdal_planstrategi_2025-2028,planstrategi,framsikt,hentet,1,0
+3338,Nore og Uvdal,3338_nore-og-uvdal_kommuneplangrunnlag_2024-2027,kunnskapsgrunnlag,framsikt,hentet,20,39
+3301,Drammen,3301_drammen_temaplan_boligutvikling_2023-2033,bolig,web,hentet,13,9
+3301,Drammen,3301_drammen_bolig_omsorgsbygg_2023-2032,bolig_omsorg,web,hentet,17,29
+3301,Drammen,3301_drammen_temaplan_aldersvennlig_samfunn_2026-2029,helse_omsorg,web,hentet,14,10
+3301,Drammen,3301_drammen_temaplan_helse_sosial_omsorg,helse_omsorg,web,hentet,6,5
+3301,Drammen,3301_drammen_temaplan_folkehelse_levekar_2026-2035,folkehelse,web,hentet,20,9
+3301,Drammen,3301_drammen_planstrategi_2024-2027,planstrategi,web,hentet,6,14
+3301,Drammen,3301_drammen_planstrategi_samlet_program,planstrategi,pdf,finnes,4,0
+3301,Drammen,3301_drammen_folkehelseoversikt_2023,folkehelse,pdf,finnes,13,0
+3301,Drammen,3301_drammen_levekarsstatistikk_2022,kunnskapsgrunnlag,pdf,finnes,62,22
+3303,Kongsberg,3303_kongsberg_boligsosial_plan_2023-2030,bolig,pdf,finnes,44,25
+3303,Kongsberg,3303_kongsberg_demografi_per_skolekrets,kunnskapsgrunnlag,pdf,finnes,41,20
+3303,Kongsberg,3303_kongsberg_temaplan_skolestruktur_2023-2030,kunnskapsgrunnlag,pdf,finnes,22,10
+3303,Kongsberg,3303_kongsberg_helse_omsorgsplan_2018-2021,helse_omsorg,pdf,finnes,51,22
+3303,Kongsberg,3303_kongsberg_temaplan_leve_hele_livet_funksjonsnedsettelse,helse_omsorg,pdf,finnes,35,12
+3303,Kongsberg,3303_kongsberg_menon_rapport,kunnskapsgrunnlag,pdf,finnes,41,31
+3305,Ringerike,3305_ringerike_arealbruk_befolkning_honefoss_2025,kunnskapsgrunnlag,pdf,finnes,20,9
+3305,Ringerike,3305_ringerike_leve_hele_livet_handlingsplan_2021,helse_omsorg,pdf,finnes,21,8
+3310,Hole,3310_hole_kommunedelplan_velferd_2026-2038,helse_omsorg,pdf,finnes,91,41
+3312,Lier,3312_lier_helhetlig_boligstrategi_2023-2027,bolig,pdf,finnes,21,13
+3312,Lier,3312_lier_temaplan_helse_omsorg_velferd_2018-2026,helse_omsorg,pdf,finnes,30,23
+3312,Lier,3312_lier_temaplan_demensomsorg_2024-2028,helse_omsorg,pdf,finnes,33,36
+3312,Lier,3312_lier_handlingsplan_demensomsorg_2025-2029,helse_omsorg,pdf,finnes,12,9
+3312,Lier,3312_lier_skolebehovsanalyse,kunnskapsgrunnlag,pdf,finnes,92,5
+3312,Lier,3312_lier_folkehelsestrategi,folkehelse,pdf,finnes,17,3
+3316,Modum,3316_modum_helse_velferdsplan_2021,helse_omsorg,pdf,finnes,20,13
+3316,Modum,3316_modum_boligplan_unge_2023,bolig,pdf,finnes,21,8
+3318,Krødsherad,3318_krodsherad_temaplan_boligutvikling_2024-2033,bolig,pdf,finnes,13,4
+3318,Krødsherad,3318_krodsherad_temaplan_boligutvikling_2024-2033_bakgrunn,bolig,pdf,finnes,34,20
+3318,Krødsherad,3318_krodsherad_demensplan_2023-2027,helse_omsorg,pdf,finnes,13,15
+3318,Krødsherad,3318_krodsherad_velferdsteknologi_2023-2027,helse_omsorg,pdf,finnes,15,0
+3318,Krødsherad,3318_krodsherad_folkehelse_oversikt_2024-2028,folkehelse,pdf,finnes,84,36
+3318,Krødsherad,3318_krodsherad_temaplan_folkehelse_2024-2033,folkehelse,pdf,finnes,12,10
+3318,Krødsherad,3318_krodsherad_bosetting_flyktninger_2024-2028,integrering,pdf,finnes,18,9
+3320,Flå,3320_flaa_planstrategi_2024-2027_horing,planstrategi,pdf,finnes,12,4
+3320,Flå,3320_flaa_folkehelse_oversikt_2024-2027,folkehelse,pdf,finnes,57,48
+3320,Flå,3320_flaa_tilskudd_unge_boligsokende_2020,bolig,pdf,finnes,1,0
+3322,Nesbyen,3322_nesbyen_folkehelse_2020,folkehelse,pdf,finnes,69,40
+3324,Gol,3324_gol_kommunedelplan_helse_omsorg_2017-2026,helse_omsorg,pdf,finnes,66,35
+3324,Gol,3324_gol_bustadpolitisk_handlingsplan_hallingdal,bolig,pdf,finnes,37,8
+3324,Gol,3324_gol_bustadpolitisk_handlingsplan_hallingdal_del2,bolig,pdf,finnes,27,33
+3324,Gol,3324_gol_folkehelseprofil_oppsummering_2024,folkehelse,pdf,finnes,7,4
+3326,Hemsedal,3326_hemsedal_bustadpolitisk_plan_2025-2030,bolig,pdf,finnes,46,10
+3326,Hemsedal,3326_hemsedal_bustadpolitisk_plan_kunnskapsgrunnlag,bolig,pdf,finnes,32,23
+3326,Hemsedal,3326_hemsedal_bustadpolitisk_plan_moglegheitsstudie,bolig,pdf,finnes,32,9
+3328,Ål,3328_aal_plan_helse_omsorgstenester_2025-2028,helse_omsorg,pdf,finnes,35,18
+3330,Hol,3330_hol_boligstrategi,bolig,pdf,finnes,27,22
+3330,Hol,3330_hol_handlingsplan_folkehelse_2021-2033,folkehelse,pdf,finnes,16,10
+3330,Hol,3330_hol_tettstedsanalyse_geilo,kunnskapsgrunnlag,pdf,finnes,52,4
+3330,Hol,3330_hol_strategi_ehelse_2024-2027,helse_omsorg,pdf,finnes,6,2
+3334,Flesberg,3334_flesberg_boligsosial_strategi_2022-2026,bolig,pdf,finnes,23,15
+3336,Rollag,3336_rollag_barnetrakk_eldretrakk_2020,kunnskapsgrunnlag,pdf,finnes,14,2
+3338,Nore og Uvdal,3338_nore-og-uvdal_boligutvikling_2023-2026,bolig,pdf,finnes,36,22
+3338,Nore og Uvdal,3338_nore-og-uvdal_demensplan_2026-2031,helse_omsorg,pdf,finnes,23,17
+3338,Nore og Uvdal,3338_nore-og-uvdal_eiendomsstrategi,bolig,pdf,finnes,13,3
