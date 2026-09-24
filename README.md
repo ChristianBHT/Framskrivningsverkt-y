@@ -1,16 +1,18 @@
-# Telemarksforsknings Framskrivningsverktøy (Fram)
+# Kommuneframsyn (arbeidstittel) - Telemarksforskning
 
 R Shiny-app som viser historisk og framskrevet etterspørsel etter kommunale
 helse- og omsorgstjenester per kommune, 2007-2050:
 
-- hjemmetjenester (brukere)
-- bolig / heldøgns omsorg (brukere)
+- brukere av hjemmesykepleie
+- brukere av boliger (heldøgns omsorg)
 - sykepleiere (avtalte årsverk)
 
 Framskrivningen bygger på statistiske modeller estimert på SSB-data og på
 SSBs befolkningsframskrivning (hovedalternativet MMMM). Appen vises med et
 95 % usikkerhetsintervall og har en valgfri "kommunens egen trend" som kan
-fases ut over 0-10 år.
+fases ut over 0-10 år. Kommunen kan i tillegg skrive inn egne tall for 2025
+(hjemmetjenester, bolig, sykepleiere), som da erstatter SSBs tall som
+utgangspunkt for framskrivningen (lagres ikke).
 
 **Publisert (beta):** https://christianbht.shinyapps.io/Fram/
 
@@ -53,9 +55,12 @@ oppstart (faller tilbake til kommunenummer uten internett).
 Øvrige script:
 
 - `modell_y5_poisson.R` / `framskriv_y5_poisson.R` - alternativ Y_5-modell
-  (Poisson). **Kjent problem:** variansparametrene estimeres ikke, så den
-  alternative linjen i appen skal ikke tolkes ennå (se
-  `dokumentasjon/beslutningslogg.md` pkt. 11)
+  (Poisson), **fjernet fra appen** fordi variansparametrene ikke estimeres
+  (se `dokumentasjon/beslutningslogg.md` pkt. 11 og 21). Scriptene er beholdt
+  til dokumentasjon
+- `lag_pyramidedata.R` - lager `data/ssb/befolkning_pyramide.rds` (alder x
+  kjønn per kommune og år, observert 2007-2025 og SSBs framskrivning
+  2026-2050) til fanen Befolkningspyramider
 - `modellsjekk_kvantil.R` - sjekker om koeffisienten på log(befolkning) er 1
   (kvantilregresjon + Bayesiansk bootstrap)
 - `hent_timer_11643.R` - laster ned SSB-tabell 11643 (timer, helsetjenester
@@ -98,7 +103,13 @@ overfladisk: sett `VIS_FULL_DOKUMENTASJON <- FALSE` i `app.R` (da vises bare
 et kort avsnitt i "Om"-fanen) og fjern `dokumentasjon/*.md` fra
 `skript/deploy_shinyapps.R`.
 
-## Datakilder (SSB statistikkbank)
+## Datakilder (SSB statistikkbank) og lisens
+
+Statistikken er hentet fra Statistisk sentralbyrå (SSB) og brukes under
+[CC BY 4.0](https://creativecommons.org/licenses/by/4.0/), som tillater
+kommersiell bruk mot kreditering ([SSBs lisensvilkår](https://www.ssb.no/diverse/lisens)).
+Tallene er bearbeidet av Telemarksforskning (framskrivningene er ikke SSBs
+tall). Krediteringen vises i appens bunntekst og i Om-fanen.
 
 04686, 12292 (omsorgstjenester), 11645 (institusjonstjenester), 11924,
 14534 (sykepleiere, avtalte årsverk), 07459 (befolkning), 12882

@@ -137,7 +137,7 @@ modellenes formler og estimeringsdetaljer, se
 ## 5. Framskrivning (`framskriv_y1.R`, `framskriv_y2_stjerne.R`, `framskriv_y5.R`)
 
 - Bruker SSBs befolkningsframskrivning, **kun hovedalternativet MMMM**
-  (tabell 12882) foreløpig - LLML/HHMH og Telemarksforsking sine
+  (tabell 12882) foreløpig - LLML/HHMH og Telemarksforskning sine
   framskrivninger er planlagt (se punkt 6, "Om"-fanens veikart), men ikke
   implementert.
 - **Årseffekt for framtidige år**: satt til gjennomsnittet av de
@@ -225,7 +225,7 @@ modellenes formler og estimeringsdetaljer, se
   ["Behov for og tilgang på arbeidskraft i offentlig helse og omsorg
   fremover" (RAPP 2026/18)](https://www.ssb.no/helse/helsetjenester/artikler/behov-for-og-tilgang-pa-arbeidskraft-i-offentlig-helse-og-omsorg-fremover/_/attachment/inline/e35491e6-e7b1-43f0-82f9-726b8b21574e:2475fafc0fdb77314f7751654ffea53725e30f2e/RAPP2026-18.pdf),
   samt å inkludere LLML- og HHMH-befolkningsframskrivninger fra SSB og
-  befolkningsframskrivninger fra Telemarksforsking som alternativ til
+  befolkningsframskrivninger fra Telemarksforskning som alternativ til
   SSBs hovedalternativ MMMM. Ingen av disse er påbegynt - kun notert som
   neste steg.
 
@@ -497,3 +497,228 @@ modellenes formler og estimeringsdetaljer, se
   `rq`-modellene leses ikke av appen og lastes ikke opp.
 - Fanen vises uavhengig av bryteren `VIS_FULL_DOKUMENTASJON` (punkt 14). Den
   er ikke redeployet ennå.
+
+## 16. Startside, Telemarksforskning-profil og bunntekst (2026-09-24)
+
+- **Startfane** ("Start", første fane og valgt ved oppstart): logo, kort
+  beskrivelse av appen, en knapp som går til fanen Framskrivning, og en
+  boks med teksten om Stiftelsen Telemarksforskning (formulert av brukeren)
+  og lenke til https://telemarksforsking.no/.
+- **Logo**: `resources/telemarks-logo.png` (levert av brukeren) vises på
+  startsiden og i topplinjen (klikkbar lenke til Telemarksforskning, med
+  alt-tekst). Filen serveres med `addResourcePath("resources", "resources")`
+  i stedet for å flyttes til `www/`, og er lagt til i opplastingslisten i
+  `skript/deploy_shinyapps.R`.
+- **Bunntekst på alle faner** (også dokumentasjonsfanene): "© [inneværende
+  år] Copyright Telemarksforskning" og "Utviklet av Christian Thorjussen"
+  (navnet er en mailto-lenke til christian.b.thorjussen@tmforsk.no).
+  Årstallet beregnes ved oppstart. Implementert som `panel_fot()` som legger
+  bunnteksten til hvert `nav_panel`, så nye faner bør lages med den.
+- **Sidepanelet** (variabel/kommune/trend) åpnes bare på Framskrivning og
+  Datatabell og skjules ellers, siden det er irrelevant på Start, Om,
+  analyse og dokumentasjon.
+- Ikke redeployet ennå.
+
+## 17. Plattformnavn, startside som verktøykasse og stavemåte (2026-09-24)
+
+- **Stavemåte**: "Telemarksforsking" er endret til "Telemarksforskning" i
+  appen, README og prosjektdokumentene (brukerens valg). URL-en
+  (https://telemarksforsking.no/) og e-postdomenet er bevisst *ikke*
+  endret, siden det er faktiske adresser. Logofilen viser fortsatt den
+  gamle stavemåten, og brukerens ordrette tekst om stiftelsen inneholder
+  fortsatt "forskingsinstitutt".
+- **To nivåer av navn**: hele verktøyet/plattformen har ett navn
+  (`APP_NAVN`, vises i topplinjen, nettleserfanen og på startsiden), mens
+  **bare fanen med framskrivningene heter "Framskrivningsmodellen Fram"**
+  (`MODELL_NAVN`). Bakgrunnen er at verktøyet skal bli mer omfattende enn
+  én modell: mange nøkkeltall, verktøy og modeller som kan være en ressurs
+  for kommunene.
+- **Foreløpig plattformnavn: "Kommuneframsyn"** (arbeidstittel, endres i
+  `APP_NAVN` i `app.R`). "Kommunekompasset" ble vurdert og forkastet: det er
+  et etablert verktøy fra KS.
+- **Startsiden** viser nå verktøyet som en verktøykasse med kort:
+  *Tilgjengelig nå* (Framskrivningsmodellen Fram, Analyse
+  stordriftsfordeler, begge med "Åpne"-knapp) og *Under utvikling*
+  (Nøkkeltall, Befolkningspyramider, Tilbud av helsepersonell, Flere modeller
+  og verktøy, uten knapp). Kortene under utvikling er bevisst merket som
+  planlagte, ikke som ferdige funksjoner. Nye verktøy legges til med
+  `verktoy_kort()`.
+- Ikke redeployet ennå.
+
+## 18. Kreditering og lisens for SSB-data (2026-09-24)
+
+- **Hva SSB krever** (https://www.ssb.no/diverse/lisens): SSBs data er
+  lisensiert under **Creative Commons Attribution 4.0 International (CC BY
+  4.0)** (tidligere NLOD, som er forenlig). **Kommersiell bruk er tillatt**,
+  også bearbeiding ("remixe, endre, og bygge videre på materialet til et
+  hvilket som helst formål, inkludert kommersielle"). Vilkårene: (1) navngi
+  SSB, helst med lenke til ssb.no, (2) oppgi en lenke til lisensen, (3)
+  opplyse om at endringer er gjort. Unntak: bilder og fotografier, samt
+  konfidensielle personopplysninger. Ingen av unntakene gjelder for
+  tabellene vi bruker (aggregerte tall).
+- **Dette er relevant for abonnementsproduktet** (todo_app.md pkt. 6.3): det
+  betyr at bruk av SSB-tallene i et betalt produkt er lovlig så lenge
+  krediteringen er på plass.
+- **Implementert i appen**:
+  - *Bunntekst på alle faner*: "Kilde: Statistisk sentralbyrå (SSB), lisens
+    CC BY 4.0. Tallene er bearbeidet av Telemarksforskning." med lenker til
+    ssb.no og til lisensen (https://creativecommons.org/licenses/by/4.0/).
+  - *Om-fanen, nytt avsnitt "Kreditering og lisens"*: navngir SSB, lenker til
+    lisensen og SSBs lisensvilkår, sier at kommersiell bruk er tillatt, og
+    beskriver **endringene**: historiske tall er samlet til dagens
+    kommunestruktur, og andel eldre med økt behov, framskrivninger og
+    usikkerhetsintervall er egne beregninger.
+  - *Ingen antydet støtte*: teksten sier eksplisitt at framskrivningene ikke
+    er SSBs tall og ikke er godkjent eller anbefalt av SSB, og at SSBs
+    befolkningsframskrivning (tabell 12882) brukes som grunnlag.
+- **Ikke avklart**: kreditering og vilkår for demensprevalensratene
+  (`dementia_dic` i `legg_til_demens.R`), som ikke kommer fra SSB, og for
+  Telemarksforsknings egne befolkningsframskrivninger hvis de tas inn.
+  Lisensen for selve appen/koden er heller ikke bestemt.
+- Ikke redeployet ennå.
+
+---
+
+## 19. Fargepalett avledet fra Telemarksforsknings logo (2026-09-24)
+
+- **Bestilling**: analyser logoens fargeskjema og bruk et passende skjema i
+  appen.
+- **Logoanalyse** (`resources/telemarks-logo.png`): to farger, petrol
+  `#004C66` (ca. 55 % av pikslene) og rav/oransje `#D17E12` (ca. 45 %), på
+  gjennomsiktig bakgrunn. Kontrast mot hvitt: petrol 9,4:1 (god for tekst og
+  flater), rå oransje bare 3,1:1 (kun akser, streker, grafikk og
+  aksenter, aldri brødtekst).
+- **Palett** (én konstant `PALETT` øverst i `app.R`; alle farger i plott,
+  tema og CSS hentes derfra, ingen hardkodede hex-verdier lenger):
+  - Hovedfarger: petrol `#004C66` (primær, topplinje, overskrifter,
+    lenker, observerte data) og oransje `#D17E12` (aksent, framskrevet,
+    aktiv fane, usikkerhetsbånd med 20 % dekning).
+  - Avledede: mørk petrol `#00374A` (hover), mørk oransje `#9C5A00`
+    (tekst i oransje, 5,4:1 mot hvitt), tekst `#1E2A30`, grå `#5C6F78`
+    (dempet tekst, 5,3:1), lyse flater `#F2F6F7` / `#E4ECEF`.
+  - Status: grønn `#2F7D5B` (suksess, 5,0:1), blå `#2B7A99` (info), rød
+    `#B3261E` (feil).
+  - Tredje serie (alternativ modell, tredje kvantil/variabel i
+    stordriftsanalysen): skifergrå `#6B7F88`.
+- **Fargesynstest**: petrol mot oransje har Lab-avstand ΔE 80-97 under
+  simulert deuteranopi, protanopi og tritanopi (Machado-matriser), altså
+  godt atskilt. Den tredje serien er valgt som nøytral grå fordi
+  alternativer som teal og dus grønn ble for like petrol eller oransje
+  under simulering (grå ΔE ≥ ca. 28-33). I tillegg er linjene forskjellige
+  i stil (heltrukken / stiplet / prikket), så figurene skilles også uten
+  farge.
+- **Endret i appen**: `bs_theme()` beholder Bootswatch *flatly* (for å ikke
+  bytte skrift), men primary/secondary/success/info/warning/danger/bg/fg
+  og lenkefarger settes fra paletten. Topplinjen er petrol med hvit tekst
+  og logoen i en hvit boks (logoen har mørk tekst og trenger lys bakgrunn),
+  aktiv fane har oransje topplinje, overskrifter på startsiden og i
+  dokumentfanene er petrol, og kortene og bunnteksten bruker de lyse
+  flatene. Tidligere plottfarger (`#0072B2`, `#D55E00`, `#009E73`) er
+  erstattet.
+- **Kontrollert** lokalt i nettleser: startside, framskrivningsfane,
+  stordriftsanalyse; ingen konsollfeil. Ikke redeployet ennå.
+- **Ikke gjort**: egen font, mørk modus og felles plotly-tema (se
+  todo_app.md pkt. 4).
+
+---
+
+## 20. Fane med befolkningspyramider (2026-09-24)
+
+- **Bestilling**: fane der brukeren velger kommune; historiske pyramider for
+  2010, 2015, 2020 og 2025 på én linje, og en litt større pyramide under for
+  et framskrevet år brukeren velger.
+- **Forhåndsberegnet, ikke regnet i appen.** Pyramidene er SSBs egne tall
+  (observert og hovedalternativet MMMM), ikke modellresultater, så det er
+  ingenting som må estimeres når brukeren velger. Vi lagrer derfor alle
+  kommuner x år x kjønn x aldersgruppe i én liten fil
+  (`data/ssb/befolkning_pyramide.rds`, 0,5 MB, 597 000 rader) laget av
+  `skript/lag_pyramidedata.R`. Fordeler: ingen API-kall i appen (raskere og
+  robust mot SSB-nedetid), ingen aggregering i appen, og tallene kan
+  kontrolleres én gang. I appen regnes bare prosentandeler og summer for
+  valgt kommune og år. Å hente fortløpende ville gitt treg fane, avhengighet
+  av SSBs API på shinyapps.io og risiko for cellegrenser; å regne ut selv er
+  bare aktuelt for framtidige *scenarier* (LLML/HHMH), og da bør også disse
+  forhåndsberegnes.
+- **Data**: 5-årige aldersgrupper (0-4, ..., 85-89, 90+), 2007-2050. Observert
+  fra `befolkning_detaljert.rds` (tabell 07459, 2024-struktur), framskrevet
+  fra tabell 12882 med samme kommunehistorikk-logikk som `framskriv_y1.R`.
+  "Hele landet" hentes direkte fra tabell 12882 (region "0") for
+  framskrevne år. Kontroll: folketall stemmer eksakt (avvik 0) med
+  `framskrevet_y1.rds` for alle 356 kommuner x 25 år.
+- **Haram (1580) er utelatt**: finnes ikke i SSBs framskrivning (samme som i
+  modellene). Landstallet for observerte år inkluderer likevel Haram.
+- **Visning**: felles akse for alle pyramidene til en kommune (største
+  verdi over alle år), slik at de kan sammenlignes og aksen ikke hopper når
+  året endres. Valgfritt: andel av befolkningen (%) i stedet for antall
+  (nyttig for å sammenligne små og store kommuner), og 2025 som omriss bak
+  den framskrevne pyramiden. Over pyramiden vises folketall, andel 65+ og
+  andel 80+ for valgt år mot 2025. Menn er petrol og kvinner oransje
+  (paletten fra pkt. 19). Året velges med glidebryter som kan animeres.
+- Startsidekortet "Befolkningspyramider" er flyttet fra "Under utvikling"
+  til "Tilgjengelig nå". Fila er lagt til i opplastingslisten. Ikke
+  redeployet ennå.
+
+---
+
+## 21. Kommunens egne tall som anker; alternativ Y_5-modell fjernet (2026-09-24)
+
+- **Bestilling**: celler der kommunen kan legge inn egne tall for Y_1, Y_2\* og
+  Y_5, slik at verdien blir det nye ankerpunktet. Ta bort den alternative
+  Y_5-modellen.
+- **Hva "anker" betyr her.** Framskrivningen har to ankre: (1) demensandelen
+  i 2025, som er en modellparametrisering (pkt. 3 i teknisk dokumentasjon) og
+  ikke berøres, og (2) det observerte 2025-*nivået*, som blandes inn med 90 %
+  vekt i 2026 og trappes lineært ned til 0 i 2050 (glidende overgang). Det er
+  (2) som byttes ut med kommunens egen verdi.
+- **Effekt.** Verdien i år t flyttes med `w(t) * (egen - SSB2025)`, der `w`
+  er overgangsvekten. Hele framskrivningen (også trend-varianten) løftes eller
+  senkes tilsvarende i starten, og effekten er borte i 2050. Skiftet følger
+  eksakt av formelen og er verifisert numerisk i appen (Halden Y_1: egen verdi
+  1 281 mot SSBs 1 081 gir 2026-verdi 1 266,1 = 1 086,1 + 0,9 x 200 og uendret
+  2050-verdi; Y_5 og Oslo testet; nullstilling gir tilbake de opprinnelige
+  tallene).
+- **Usikkerhetsbåndet** flyttes med samme beløp som punktestimatet. Det er
+  eksakt, fordi bootstrap-persentilene beregnes av samme glattede formel og
+  skiftet er likt i alle trekk, så ingen ny bootstrap trengs. Båndet forblir
+  modellusikkerhet og sier ingenting om hvor sikkert det innlagte tallet er;
+  appen sier dette eksplisitt i en merknad over grafen.
+- **Brukergrensesnitt**: tre felt i sidepanelet ("Kommunens egne tall"), ett per
+  variabel, for valgt kommune, med SSBs 2025-tall som veiledning under
+  feltene. Egen verdi vises som en rute (diamant) i 2025 i grafen, med en
+  blå merknad over grafen. Tallene huskes per kommune mens økten varer, kan
+  nullstilles, og lagres **ikke** på serveren eller mellom økter (ikke delt
+  mellom brukere). Datatabellen og CSV-nedlastingen får en egen rad for den
+  innlagte verdien.
+- **Valg**: bare 2025 (siste observerte år) er støttet som ankeråret.
+  Kommuner med nyere tall (2026) kan legge dem inn, men de tolkes da som
+  2025-nivå. Vurder senere en egen "gjelder år"-velger og en tilpasset vekt.
+  Ikke gjort: opplasting av flere år, lagring mellom økter (krever innlogging
+  eller lokal lagring), og en usikkerhet på selve tallet.
+- **Alternativ Y_5-modell (Poisson) fjernet**: linjen, fargen, koden i
+  `framskriv_trend()`/`lag_tidsserie()` og filene i opplastingslisten
+  (`framskrevet_y5_poisson.rds`, `modell_y5p_hovedmodell_slope.rds`) er tatt
+  ut, siden modellen ikke var gyldig estimert (pkt. 11). Scriptene
+  (`modell_y5_poisson.R`, `framskriv_y5_poisson.R`) og resultatfilene er
+  beholdt i repoet til dokumentasjon. Den åpne feilen er dermed ikke lenger
+  synlig for brukerne.
+- Ikke redeployet ennå.
+
+---
+
+## 22. Nye visningsnavn på variablene (2026-09-24)
+
+- Y_1 heter i appen nå **"Brukere av hjemmesykepleie"** (tidligere "Etterspørsel
+  etter hjemmetjenester (brukere)") og Y_2\* **"Brukere av boliger"** (tidligere
+  "Etterspørsel etter bolig (brukere)"). Y_5 er uendret ("Etterspørsel etter
+  sykepleier (avtalte årsverk)").
+- Navnene brukes i variabelvelgeren, grafens tittel, feltene for egne tall,
+  hjelpeteksten, startsidekortet, Om-fanen og legenden i stordriftsanalysen.
+  Bare visningsnavn er endret; interne koder (Y_1, Y_2_stjerne, Y_5), filnavn og
+  modeller er uendret.
+- Merk: navnet "hjemmesykepleie" er smalere enn SSBs kategori
+  "hjemmetjenester" (som også omfatter praktisk bistand). Tabellene i Om-fanen
+  bruker fortsatt SSBs egne betegnelser. Ikke redeployet ennå.
+- **Tillegg (samme dag):** Y_5 heter nå **"Sykepleiere (avtalte årsverk)"**
+  (tidligere "Etterspørsel etter sykepleier (avtalte årsverk)"). Navnet er
+  valgt av meg som forslag i samme stil som de to andre og kan endres i
+  `Y_VARIABLER` i `app.R`.

@@ -297,6 +297,25 @@ samme som `T = 0`). Se kommentarblokken ved `framskriv_trend()` i `app.R`.
 -variabelen i skriptene kan endres til `"Personer1"` (LLML) eller
 `"Personer2"` (HHMH) for å beregne alternative scenarioer.
 
+**Kommunens egne tall som anker (appen)**: brukeren kan skrive inn kommunens
+egen verdi `e_k` for 2025 for Y_1, Y_2-stjerne og Y_5. Den erstatter SSBs observerte
+2025-verdi `o_k` som anker i den glidende overgangen. Overgangen er
+
+```
+verdi(t) = w(t) * anker + (1 - w(t)) * modell(t),   w(t) = 0,9 * (2050 - t) / (2050 - 2026)
+```
+
+så en endring av ankeret fra `o_k` til `e_k` endrer verdien med
+`w(t) * (e_k - o_k)` (og med `w(t) * (e_k - modell(t))` hvis SSBs 2025-tall
+mangler). Skiftet er likt for hver bootstrap-trekning, så det ferdige
+95 %-båndet (persentiler av de glattede verdiene) flyttes nøyaktig like mye,
+uten ny bootstrap (`juster_anker()` i `app.R`). Nedre og øvre grense klippes ved 0.
+Egne tall påvirker hverken modellparametrene, kommuneeffektene eller
+demensandel-ankeret `a_k` (som er en modellparametrisering); de flytter bare
+nivået, med effekt som er borte i 2050. Det samme skiftet brukes i
+trend-varianten. Båndet uttrykker fortsatt bare modellusikkerhet, ikke
+usikkerhet i det innlagte tallet. Tallene lagres ikke (bare i økten).
+
 ## 8. Kvantifisering av usikkerhet (`usikkerhet_y1.R`, `usikkerhet_y2_stjerne.R`, `usikkerhet_y5.R`)
 
 **Metode**: Bayesiansk bootstrap PÅ KOMMUNE-NIVÅ, ikke radnivå - dette
@@ -373,7 +392,9 @@ på bekostning av lengre kjøretid (hvert R-refit av `hovedmodell_slope` tar
 lengre tid enn intercept-only-varianten, pga. flere parametre og en
 korrelert tilfeldig helning).
 
-## 9. Alternativ Y_5-modell: Poisson (`modell_y5_poisson.R`, `framskriv_y5_poisson.R`) - KJENT PROBLEM
+## 9. Alternativ Y_5-modell: Poisson (`modell_y5_poisson.R`, `framskriv_y5_poisson.R`) - KJENT PROBLEM, FJERNET FRA APPEN
+
+**Status (2026-09-24): modellen er fjernet fra appen** (linjen vises ikke lenger, og filene er tatt ut av opplastingslisten). Scriptene er beholdt til dokumentasjon; se beslutningslogg pkt. 21.
 
 **Hensikt**: alternativ estimering av Y_5 med samme modellfamilie som
 Y_1/Y_2\* (i stedet for log-lineær `lmer` i pkt. 5), vist som en egen linje
@@ -504,7 +525,7 @@ Se også [videre_arbeid.md](videre_arbeid.md) for arbeidsplanen.
   (standardframskrivningen) - ikke for den brukerstyrte
   kommunespesifikke trend-varianten (`T > 0`).
 - Kun ett befolkningsscenario (MMMM) er beregnet - LLML, HHMH og
-  Telemarksforsking sine befolkningsframskrivninger er planlagt, men ikke
+  Telemarksforskning sine befolkningsframskrivninger er planlagt, men ikke
   implementert (se "Om"-fanen i appen).
 - Estimering av TILBUD av sykepleiere (i tillegg til dagens
   etterspørselsestimat) er planlagt, med metodikk fra SSB-rapporten

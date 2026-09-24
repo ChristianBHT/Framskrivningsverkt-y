@@ -16,6 +16,8 @@
 
 appfiler <- c(
   "app.R",
+  # Logo (vises i topplinjen og på Start-fanen; serveres via addResourcePath).
+  file.path("resources", "telemarks-logo.png"),
   # Vises som faner i appen (leses ved oppstart).
   file.path("dokumentasjon", c(
     "teknisk_dokumentasjon.md",
@@ -33,14 +35,12 @@ appfiler <- c(
     "modell_y1_hovedmodell_slope.rds",
     "modell_y2s_hovedmodell_slope.rds",
     "modell_y5_hovedmodell_slope.rds",
-    # Alternativ Y_5-modell (Poisson) - se dokumentasjon/beslutningslogg.md
-    # pkt. 11: NB modellen er foreløpig ikke gyldig estimert.
-    "framskrevet_y5_poisson.rds",
-    "modell_y5p_hovedmodell_slope.rds",
     # Fanen "Analyse stordriftsfordeler" (skript/modellsjekk_kvantil.R)
     "modellsjekk_kvantil_y_1_sammendrag.rds",
     "modellsjekk_kvantil_y_2_stjerne_sammendrag.rds",
-    "modellsjekk_kvantil_y_5_sammendrag.rds"
+    "modellsjekk_kvantil_y_5_sammendrag.rds",
+    # Fanen "Befolkningspyramider" (skript/lag_pyramidedata.R)
+    "befolkning_pyramide.rds"
   ))
 )
 stopifnot(all(file.exists(appfiler)))
